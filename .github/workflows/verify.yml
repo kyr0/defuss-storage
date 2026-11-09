@@ -1,0 +1,63 @@
+name: Verify
+on: [push, pull_request]
+# bun is the package manager (bun.lock); Node.js is the primary runtime under test.
+jobs:
+  # Memory/native contracts, fault tests and installed-package checks per OS.
+  # Node 20 is past end of life; it stays a target only while this suite passes.
+  node:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [24]
+        include:
+          - os: ubuntu-latest
+            node: 20
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run build
+      # vitest runs on the Node.js selected above (its bin uses `#!/usr/bin/env node`).
+      - run: bun run test
+      - run: bun run test:package
+      - run: bun run example
+      - if: matrix.node == 24
+        run: bun run coverage
+  # Real OPFS in dedicated workers of all three engines.
+  browsers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install --with-deps chromium firefox webkit
+      - run: bun run build
+      - run: bun run test:browsers
+  # Bun as the runtime: the same suite and packed-consumer checks.
+  bun:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun test tests/
+      - run: bun scripts/package-test.mjs

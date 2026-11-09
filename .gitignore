@@ -1,0 +1,15 @@
+node_modules/
+dist/
+output/
+*.tgz
+.env
+var/*
+tmp/*
+output/*
+input/*
+.DS_Store
+.vae/SWARM_STATUS.yaml
+coverage/
+.cache/
+__pycache__/
+release/

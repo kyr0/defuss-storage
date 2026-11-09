@@ -1,0 +1,13 @@
+{
+  // Typechecks tests and examples against the built declarations in dist/ (run
+  // after `bun run build`). Separate from tsconfig.json, which pkgroll uses for
+  // the package build: `.ts` import extensions need noEmit.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    // Resizable ArrayBuffers (Node 20+, all tested browsers) for the borrowed readInto tests.
+    "lib": ["ES2022", "ES2024.ArrayBuffer"]
+  },
+  "include": ["tests/**/*.ts", "examples/**/*.ts", "vitest.config.ts"]
+}
