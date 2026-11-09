@@ -1,0 +1,942 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--site:head-->
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <script>
+    // Before first paint: the saved theme, else the system preference (no flash of the wrong theme).
+    (() => {
+      let saved = null;
+      try { saved = localStorage.getItem('st-theme'); } catch {}
+      const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.classList.toggle('dark', dark);
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      // Opened from disk, browsers refuse module scripts: the CSS shows notes in place of the charts.
+      if (location.protocol !== 'file:') document.documentElement.dataset.served = '';
+    })();
+    // Opened from disk, links and the language select point at server paths
+    // such as /de/#demo, which the file system does not resolve, and
+    // Chromium and WebKit run no module script there. This classic script maps
+    // those paths to the prerendered files next to this page.
+    if (location.protocol === 'file:') {
+      const root = location.pathname.replace(/(?:(?:en|de)\/)?[^/]*$/, '');
+      const toFile = href => {
+        const [path, hash] = href.split('#');
+        return `${root}${path.slice(1)}${path.endsWith('/') ? 'index.html' : ''}${hash === undefined ? '' : `#${hash}`}`;
+      };
+      window.stDiskUrl = toFile;
+      addEventListener('DOMContentLoaded', () => {
+        for (const link of document.querySelectorAll('a[href^="/"]')) link.setAttribute('href', toFile(link.getAttribute('href')));
+      });
+      addEventListener('change', event => {
+        if (!event.target.matches('.st-lang')) return;
+        location.assign(toFile(`/${event.target.value}/${location.hash}`));
+      });
+    }
+  </script>
+  <script type="module" src="/src/main.ts"></script>
+</head>
+<body>
+<svg class="sr-only" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><rect x="2" y="2" width="5.5" height="5.5" rx="1.4" fill="currentColor"/><rect x="9.25" y="2" width="5.5" height="5.5" rx="1.4" fill="currentColor"/><rect x="16.5" y="2" width="5.5" height="5.5" rx="1.4" fill="currentColor"/><rect x="2" y="9.25" width="5.5" height="5.5" rx="1.4" fill="currentColor"/><rect x="9.25" y="9.25" width="5.5" height="5.5" rx="1.4" fill="currentColor"/><rect x="16.5" y="9.25" width="5.5" height="5.5" rx="1.4" fill="currentColor"/><rect x="2" y="16.5" width="5.5" height="5.5" rx="1.4" fill="currentColor"/><rect class="st-logo-head" x="9.25" y="16.5" width="5.5" height="5.5" rx="1.4"/><rect x="17.1" y="17.1" width="4.3" height="4.3" rx="1.1" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.6 1.2" opacity=".55"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m-7.07-17.07 1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-7-7 7 7-7 7"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14m7-7-7 7-7-7"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7M12 19V5"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M7 7h10v10M7 17 17 7"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></symbol>
+  <symbol id="i-linkedin" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 3.5v17l14-8.5z"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M8 13h8M8 17h5"/></symbol>
+  <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5M3 12a9 3 0 0 0 18 0"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12.83 2.18 8.58 3.9a1 1 0 0 1 0 1.83l-8.58 3.9a2 2 0 0 1-1.66 0L2.6 7.91a1 1 0 0 1 0-1.83l8.58-3.9a2 2 0 0 1 1.66 0Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65M22 12.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
+  <symbol id="i-package" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12m0 0 8.7-5M12 12 3.3 7"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6m8 14h8"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2m16 0h2m-7-1v2m-6-2v2"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2m0 16v2M2 15h2m-2-6h2m16 6h2m-2-6h2M9 2v2m0 16v2"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16V9m5 7V5m5 11v-4"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-languages" viewBox="0 0 24 24"><path d="m5 8 6 6m-7 0 6-6 2-3M2 5h12M7 2h1m14 20-5-10-5 10m2-4h6"/></symbol>
+</svg>
+
+<a class="st-skip" href="#main" data-t="nav.skip"></a>
+<div id="top" class="st-page">
+  <header class="mk-header st-header" data-variant="floating" data-i18n-component>
+    <div class="mk-header-inner">
+      <a href="/{lang}/" data-router-link class="mk-header-brand st-brand" data-ta="aria-label:nav.home"><svg class="st-logo" aria-hidden="true"><use href="#i-logo"/></svg><span class="mk-header-name">defuss-storage</span></a>
+      <nav class="mk-header-nav" data-ta="aria-label:nav.label">
+        <ul class="nav-menu-list">
+          <li class="nav-menu-item"><a class="nav-menu-link" data-router-link data-nav="how" href="/{lang}/#how" data-t="nav.how"></a></li>
+          <li class="nav-menu-item"><a class="nav-menu-link" data-router-link data-nav="demo" href="/{lang}/#demo" data-t="nav.demo"></a></li>
+          <li class="nav-menu-item"><a class="nav-menu-link" data-router-link data-nav="performance" href="/{lang}/#performance" data-t="nav.benchmarks"></a></li>
+          <li class="nav-menu-item"><a class="nav-menu-link" data-router-link data-nav="install" href="/{lang}/#install" data-t="nav.install"></a></li>
+        </ul>
+      </nav>
+      <div class="mk-header-actions">
+        <button type="button" class="btn st-wide" data-variant="outline" data-size="sm" data-command-trigger="cmd">
+          <svg class="st-icon" aria-hidden="true"><use href="#i-search"/></svg><span data-t="nav.jump"></span>
+          <kbd class="kbd-group"><kbd class="kbd" data-mod>Ctrl</kbd><kbd class="kbd">K</kbd></kbd>
+        </button>
+        <select class="select st-lang" data-size="sm" data-ta="aria-label:nav.language">
+          <option value="en" lang="en">English</option>
+          <option value="de" lang="de">Deutsch</option>
+        </select>
+        <label class="swap" data-variant="rotate" data-size="sm">
+          <input type="checkbox" id="theme-toggle" data-ta="aria-label:nav.dark">
+          <span class="swap-on" aria-hidden="true"><svg class="st-icon"><use href="#i-moon"/></svg></span>
+          <span class="swap-off" aria-hidden="true"><svg class="st-icon"><use href="#i-sun"/></svg></span>
+        </label>
+        <a class="btn st-wide" data-variant="ghost" data-size="icon" href="https://github.com/kyr0/defuss-storage" target="_blank" rel="noopener" data-ta="aria-label:nav.github"><svg class="st-icon" aria-hidden="true"><use href="#i-github"/></svg></a>
+        <button type="button" class="btn st-menu" data-variant="ghost" data-size="icon" data-sheet-trigger="st-sheet" aria-haspopup="dialog" data-ta="aria-label:nav.menu"><svg class="st-icon" aria-hidden="true"><use href="#i-menu"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <dialog id="st-sheet" class="sheet" data-side="right" aria-modal="true" aria-labelledby="st-sheet-title" data-i18n-component>
+    <div class="sheet-content">
+      <div class="sheet-header"><h2 class="sheet-title" id="st-sheet-title">defuss-storage</h2></div>
+      <div class="sheet-body">
+        <ul class="mk-header-sheet-nav">
+          <li><a data-router-link data-sheet-close href="/{lang}/#demo" data-t="nav.demo2"></a></li>
+          <li><a data-router-link data-sheet-close href="/{lang}/#how" data-t="nav.how2"></a></li>
+          <li><a data-router-link data-sheet-close href="/{lang}/#performance" data-t="nav.benchmarks2"></a></li>
+          <li><a data-router-link data-sheet-close href="/{lang}/#install" data-t="nav.install2"></a></li>
+        </ul>
+      </div>
+      <div class="sheet-footer"><a class="btn" data-variant="outline" href="https://github.com/kyr0/defuss-storage" target="_blank" rel="noopener"><svg class="st-icon" aria-hidden="true"><use href="#i-github"/></svg>GitHub</a></div>
+    </div>
+  </dialog>
+
+  <main id="main" class="st-main" tabindex="-1">
+
+  <!-- ================================ HOME ================================ -->
+  <div class="st-view" data-view="home" hidden data-i18n-component>
+
+  <section class="parallax st-hero-scene" aria-labelledby="hero-title">
+    <div class="parallax-layer" data-depth="far" aria-hidden="true">
+      <div class="pattern-grid st-hero-grid"></div>
+    </div>
+    <div class="parallax-layer" data-depth="mid" aria-hidden="true" style="--parallax-speed:22%">
+      <div class="corner-blob st-blob st-blob-a"></div>
+      <div class="corner-blob-3 st-blob st-blob-b"></div>
+    </div>
+    <div class="parallax-content st-hero-content">
+      <section class="mk-hero" data-variant="split" data-align="start">
+        <div class="mk-hero-copy">
+          <a class="mk-hero-pill" href="#install"><span class="badge" data-size="sm">v{{version}}</span><span data-t="hero.pill"></span><svg class="st-icon" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          <h1 class="mk-hero-title st-display" id="hero-title" data-t="hero.title"></h1>
+          <p class="st-flip"><span data-t="hero.flipLead"></span> <span class="text-rotate st-accent-text" data-effect="fade" style="--text-rotate-duration:15s" data-t="hero.rotate"></span></p>
+          <p class="mk-hero-desc" data-t="hero.desc"></p>
+          <div class="mk-hero-actions">
+            <span class="aura aura-glow st-cta-aura"><a class="btn" data-size="lg" href="#demo"><span data-t="hero.try"></span><svg class="st-icon" aria-hidden="true"><use href="#i-arrow-down"/></svg></a></span>
+            <a class="btn" data-variant="outline" data-size="lg" href="#performance"><svg class="st-icon" aria-hidden="true"><use href="#i-chart"/></svg><span data-t="hero.bench"></span></a>
+          </div>
+          <p class="st-hero-footnote" data-t="hero.footnote"></p>
+        </div>
+        <div class="mk-hero-media st-hero-media">
+          <div class="st-hero-window">
+            <div class="mockup-code st-code" data-chrome="mac" data-title="storage.worker.js" data-numbers data-snippet="hero"></div>
+            <p class="st-receipt"><span class="st-receipt-key" data-t="hero.chipLabel"></span> <span class="text-rotate" data-effect="fade" style="--text-rotate-duration:9s" data-t="hero.chip"></span></p>
+          </div>
+          <div class="st-install st-hero-install" data-install>
+            <div class="toggle-group" role="group" data-type="single" data-variant="outline" data-ta="aria-label:install.pm">
+              <button type="button" class="toggle" aria-pressed="true" value="bun">bun</button>
+              <button type="button" class="toggle" aria-pressed="false" value="pnpm">pnpm</button>
+              <button type="button" class="toggle" aria-pressed="false" value="npm">npm</button>
+              <button type="button" class="toggle" aria-pressed="false" value="yarn">yarn</button>
+            </div>
+            <div class="st-install-line">
+              <div class="mockup-code st-code" data-variant="outline" data-chrome="none" data-pm="bun" data-snippet="install-bun"></div>
+              <div class="mockup-code st-code" data-variant="outline" data-chrome="none" data-pm="pnpm" data-snippet="install-pnpm" hidden></div>
+              <div class="mockup-code st-code" data-variant="outline" data-chrome="none" data-pm="npm" data-snippet="install-npm" hidden></div>
+              <div class="mockup-code st-code" data-variant="outline" data-chrome="none" data-pm="yarn" data-snippet="install-yarn" hidden></div>
+              <button type="button" class="btn st-copy" data-variant="secondary" data-size="sm" data-copy-install><svg class="st-icon" aria-hidden="true"><use href="#i-copy"/></svg><span data-t="install.copy"></span></button>
+            </div>
+          </div>
+          <p class="mk-hero-note st-hero-note" data-t="hero.note"></p>
+        </div>
+      </section>
+
+      <section class="st-layer" aria-labelledby="layer-title">
+        <div class="st-layer-copy">
+          <h2 class="st-why-title" id="layer-title"><a class="heading-anchor" href="#layer-title" data-ta="aria-label:anchor.layer">#</a><span data-t="layer.title"></span></h2>
+          <p class="st-layer-desc" data-t="layer.desc"></p>
+        </div>
+        <figure class="diagram st-layers" data-type="layers" data-ta="aria-label:layer.label">
+          <span class="st-layer-arrow" aria-hidden="true"></span>
+          <div class="diagram-canvas">
+            <div class="diagram-node" data-node="app"><span class="diagram-node-eyebrow" data-t="layer.app.eyebrow"></span><span class="diagram-node-name" data-t="layer.app.name"></span><span class="diagram-node-meta" data-t="layer.app.meta"></span></div>
+            <div class="diagram-node" data-node="data"><span class="diagram-node-eyebrow" data-t="layer.data.eyebrow"></span><span class="diagram-node-name" data-t="layer.data.name"></span><span class="diagram-node-meta" data-t="layer.data.meta"></span></div>
+            <div class="diagram-node" data-node="files" data-tone="accent"><span class="diagram-node-eyebrow">defuss-storage</span><span class="diagram-node-name" data-t="layer.files.name"></span><span class="diagram-node-meta" data-t="layer.files.meta"></span></div>
+            <div class="diagram-node" data-node="backends"><span class="diagram-node-eyebrow" data-t="layer.backends.eyebrow"></span><span class="diagram-node-name" data-t="layer.backends.name"></span><span class="diagram-node-meta" data-t="layer.backends.meta"></span></div>
+          </div>
+        </figure>
+      </section>
+
+      <section class="st-why" aria-labelledby="why">
+        <h2 class="st-why-title" id="why"><a class="heading-anchor" href="#why" data-ta="aria-label:anchor.why">#</a><span data-t="why.title"></span></h2>
+        <div class="st-why-grid">
+          <article class="st-why-item parallax-reveal">
+            <span class="st-why-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-db"/></svg></span>
+            <h3 data-t="why.persist.title"></h3>
+            <p data-t="why.persist.text"></p>
+          </article>
+          <article class="st-why-item parallax-reveal">
+            <span class="st-why-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-layers"/></svg></span>
+            <h3 data-t="why.contract.title"></h3>
+            <p data-t="why.contract.text"></p>
+          </article>
+          <article class="st-why-item parallax-reveal">
+            <span class="st-why-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-gauge"/></svg></span>
+            <h3 data-t="why.fast.title"></h3>
+            <p data-t="why.fast.text"></p>
+          </article>
+          <article class="st-why-item parallax-reveal">
+            <span class="st-why-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-shield"/></svg></span>
+            <h3 data-t="why.bounded.title"></h3>
+            <p data-t="why.bounded.text"></p>
+          </article>
+          <article class="st-why-item parallax-reveal">
+            <span class="st-why-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-lock"/></svg></span>
+            <h3 data-t="why.owner.title"></h3>
+            <p data-t="why.owner.text"></p>
+          </article>
+          <article class="st-why-item parallax-reveal">
+            <span class="st-why-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-package"/></svg></span>
+            <h3 data-t="why.small.title"></h3>
+            <p data-t="why.small.text"></p>
+          </article>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <div class="st-flythrough">
+    <section class="parallax" data-sticky style="--parallax-length:2" data-ta="aria-label:fly.label">
+      <div class="parallax-stage st-fly-stage">
+        <canvas class="st-shader" aria-hidden="true"></canvas>
+        <div class="parallax-layer" data-motion="pass" style="animation-range:contain 0% contain 30%;z-index:1"><p class="st-fly-word" data-t="fly.open"></p></div>
+        <div class="parallax-layer" data-motion="pass" style="animation-range:contain 23% contain 53%;z-index:2"><p class="st-fly-word" data-t="fly.append"></p></div>
+        <div class="parallax-layer" data-motion="pass" style="animation-range:contain 46% contain 76%;z-index:3"><p class="st-fly-word" data-t="fly.stream"></p></div>
+        <div class="parallax-layer" data-motion="pass" style="animation-range:contain 69% contain 100%;z-index:4"><p class="st-fly-word" data-t="fly.flush"></p></div>
+      </div>
+    </section>
+  </div>
+
+  <section id="how" class="st-section parallax-reveal" aria-labelledby="how-title">
+    <section class="mk-features st-how">
+      <div class="mk-features-head">
+        <span class="mk-features-eyebrow" data-t="how.eyebrow"></span>
+        <h2 class="mk-features-title st-display" id="how-title"><a class="heading-anchor" href="#how" data-ta="aria-label:anchor.how">#</a><span data-t="how.title"></span></h2>
+        <p class="mk-features-desc" data-t="how.desc"></p>
+      </div>
+      <figure class="diagram st-diagram" data-type="data-flow" data-ta="aria-label:how.diagramLabel">
+        <div class="diagram-canvas" style="grid-template-columns:repeat(5,minmax(8.5rem,1fr));--diagram-node-w:10.5rem">
+          <div class="diagram-group" data-shape="lane" style="--col:1;--row:1;--span:5"><span class="diagram-group-label" data-t="how.lane.calls"></span></div>
+          <div class="diagram-group" data-shape="lane" style="--col:1;--row:2;--span:5"><span class="diagram-group-label" data-t="how.lane.backends"></span></div>
+          <div class="diagram-node" data-node="code" data-shape="pill" style="--col:1;--row:1">
+            <span class="diagram-node-name" data-t="how.node.code"></span>
+            <span class="diagram-node-meta" data-t="how.node.codeMeta"></span>
+          </div>
+          <div class="diagram-node" data-node="handle" style="--col:2;--row:1">
+            <span class="diagram-node-eyebrow">StorageFile</span>
+            <span class="diagram-node-name" data-t="how.node.handle"></span>
+            <span class="diagram-node-meta" data-t="how.node.handleMeta"></span>
+          </div>
+          <div class="diagram-node" data-node="admit" data-tone="accent" style="--col:3;--row:1">
+            <span class="diagram-node-eyebrow" data-t="how.node.admitEyebrow"></span>
+            <span class="diagram-node-name" data-t="how.node.admit"></span>
+            <span class="diagram-node-meta" data-t="how.node.admitMeta"></span>
+          </div>
+          <div class="diagram-node" data-node="queue" style="--col:4;--row:1">
+            <span class="diagram-node-eyebrow" data-t="how.node.queueEyebrow"></span>
+            <span class="diagram-node-name" data-t="how.node.queue"></span>
+            <span class="diagram-node-meta" data-t="how.node.queueMeta"></span>
+          </div>
+          <div class="diagram-node" data-node="result" data-shape="pill" style="--col:5;--row:1">
+            <span class="diagram-node-name" data-t="how.node.result"></span>
+            <span class="diagram-node-meta">{ offset, byteLength }</span>
+          </div>
+          <div class="diagram-node" data-node="memory" data-shape="store" style="--col:2;--row:2">
+            <span class="diagram-node-name" data-t="how.node.memory"></span>
+            <span class="diagram-node-meta" data-t="how.node.memoryMeta"></span>
+          </div>
+          <div class="diagram-node" data-node="native" data-shape="store" style="--col:3;--row:2">
+            <span class="diagram-node-name" data-t="how.node.native"></span>
+            <span class="diagram-node-meta" data-t="how.node.nativeMeta"></span>
+          </div>
+          <div class="diagram-node" data-node="opfs" data-shape="store" data-tone="accent" style="--col:4;--row:2">
+            <span class="diagram-node-name">OPFS</span>
+            <span class="diagram-node-meta" data-t="how.node.opfsMeta"></span>
+          </div>
+        </div>
+        <ol class="diagram-edges">
+          <li class="diagram-edge" data-from="code" data-to="handle" data-flow="2400" data-flow-delay="0"></li>
+          <li class="diagram-edge" data-from="handle" data-to="admit" data-flow="2400" data-flow-delay="500"></li>
+          <li class="diagram-edge" data-from="admit" data-to="queue" data-tone="accent" data-flow="2400" data-flow-delay="1000"></li>
+          <li class="diagram-edge" data-from="queue" data-to="result" data-flow="2400" data-flow-delay="1500"></li>
+          <li class="diagram-edge" data-from="queue" data-to="memory" data-line="dashed"><span>read / write</span></li>
+          <li class="diagram-edge" data-from="queue" data-to="native" data-line="dashed"><span>writev</span></li>
+          <li class="diagram-edge" data-from="queue" data-to="opfs" data-tone="accent"><span>SyncAccessHandle</span></li>
+        </ol>
+      </figure>
+      <ol class="st-steps">
+        <li class="st-step parallax-reveal"><span class="st-step-n" aria-hidden="true">1</span><div><h3 data-t="how.step1.title"></h3><p data-t="how.step1.text"></p></div></li>
+        <li class="st-step parallax-reveal"><span class="st-step-n" aria-hidden="true">2</span><div><h3 data-t="how.step2.title"></h3><p data-t="how.step2.text"></p></div></li>
+        <li class="st-step parallax-reveal"><span class="st-step-n" aria-hidden="true">3</span><div><h3 data-t="how.step3.title"></h3><p data-t="how.step3.text"></p></div></li>
+        <li class="st-step parallax-reveal"><span class="st-step-n" aria-hidden="true">4</span><div><h3 data-t="how.step4.title"></h3><p data-t="how.step4.text"></p></div></li>
+      </ol>
+    </section>
+  </section>
+
+  <section id="demo" class="st-section parallax-reveal" data-reveal="zoom" aria-labelledby="demo-title">
+    <header class="mk-section-header" data-align="center">
+      <div class="mk-section-header-copy">
+        <span class="mk-section-header-eyebrow" data-t="demo.eyebrow"></span>
+        <h2 class="mk-section-header-title st-display" id="demo-title"><a class="heading-anchor" href="#demo" data-ta="aria-label:anchor.demo">#</a><span data-t="demo.title"></span></h2>
+        <p class="mk-section-header-desc" data-t="demo.desc"></p>
+      </div>
+    </header>
+
+    <div class="st-window">
+      <div class="alert st-opfs-alert" role="status" hidden>
+        <svg class="alert-icon st-icon" aria-hidden="true"><use href="#i-shield"/></svg>
+        <div class="alert-content"><h3 class="alert-title" data-t="demo.fallback.title"></h3><p class="alert-description st-opfs-text"></p></div>
+      </div>
+      <div class="tabs st-tabs">
+        <div class="tab-list" role="tablist" data-size="xl" data-ta="aria-label:demo.tabs">
+          <button class="tab-trigger st-tab" role="tab" aria-selected="true" aria-controls="panel-persist" id="tab-persist"><svg class="st-icon st-tab-icon" aria-hidden="true"><use href="#i-file"/></svg><span class="st-tab-text"><span class="st-tab-title" data-t="demo.tab.persist"></span><span class="st-tab-desc" data-t="demo.tab.persistDesc"></span></span></button>
+          <button class="tab-trigger st-tab" role="tab" aria-selected="false" aria-controls="panel-seek" id="tab-seek" tabindex="-1"><svg class="st-icon st-tab-icon" aria-hidden="true"><use href="#i-search"/></svg><span class="st-tab-text"><span class="st-tab-title" data-t="demo.tab.seek"></span><span class="st-tab-desc" data-t="demo.tab.seekDesc"></span></span></button>
+          <button class="tab-trigger st-tab" role="tab" aria-selected="false" aria-controls="panel-owner" id="tab-owner" tabindex="-1"><svg class="st-icon st-tab-icon" aria-hidden="true"><use href="#i-lock"/></svg><span class="st-tab-text"><span class="st-tab-title" data-t="demo.tab.owner"></span><span class="st-tab-desc" data-t="demo.tab.ownerDesc"></span></span></button>
+          <button class="tab-trigger st-tab" role="tab" aria-selected="false" aria-controls="panel-limits" id="tab-limits" tabindex="-1"><svg class="st-icon st-tab-icon" aria-hidden="true"><use href="#i-shield"/></svg><span class="st-tab-text"><span class="st-tab-title" data-t="demo.tab.limits"></span><span class="st-tab-desc" data-t="demo.tab.limitsDesc"></span></span></button>
+          <button class="tab-trigger st-tab" role="tab" aria-selected="false" aria-controls="panel-playground" id="tab-playground" tabindex="-1"><svg class="st-icon st-tab-icon" aria-hidden="true"><use href="#i-terminal"/></svg><span class="st-tab-text"><span class="st-tab-title" data-t="demo.tab.playground"></span><span class="st-tab-desc" data-t="demo.tab.playgroundDesc"></span></span></button>
+        </div>
+
+        <!-- Persist -->
+        <div class="tab-content" role="tabpanel" id="panel-persist" aria-labelledby="tab-persist" tabindex="0">
+          <div class="st-demo-grid" data-demo="persist">
+            <div class="st-demo-side">
+              <h3 class="st-demo-title" id="persist"><a class="heading-anchor" href="#persist" data-ta="aria-label:anchor.persist">#</a><span data-t="persist.title"></span></h3>
+              <p class="st-demo-text" data-t="persist.text"></p>
+              <form class="st-row st-persist-form" data-backend-controls>
+                <label class="sr-only" for="persist-line" data-t="persist.inputLabel"></label>
+                <input class="input" id="persist-line" name="line" autocomplete="off" maxlength="200" data-ta="placeholder:persist.placeholder">
+                <button class="btn" type="submit"><span data-t="persist.append"></span><kbd class="kbd" data-size="sm">Enter</kbd></button>
+              </form>
+              <div class="st-row" data-backend-controls>
+                <button type="button" class="btn" data-variant="outline" data-size="sm" data-action="read"><svg class="st-icon" aria-hidden="true"><use href="#i-file"/></svg><span data-t="persist.read"></span></button>
+                <button type="button" class="btn" data-variant="outline" data-size="sm" data-action="truncate"><svg class="st-icon" aria-hidden="true"><use href="#i-reset"/></svg><span data-t="persist.truncate"></span></button>
+                <button type="button" class="btn" data-variant="ghost" data-size="sm" data-action="reload"><svg class="st-icon" aria-hidden="true"><use href="#i-refresh"/></svg><span data-t="persist.reload"></span></button>
+              </div>
+              <div class="mockup-code st-code st-code-small" data-variant="outline" data-chrome="none" data-wrap data-snippet="persist"></div>
+            </div>
+            <div class="st-backend-col">
+              <div class="toggle-group st-backend" role="group" data-type="single" data-variant="outline" data-size="sm" data-ta="aria-label:demo.backend">
+                <button type="button" class="toggle" aria-pressed="false" value="memory"><span data-t="demo.backendMemory"></span></button>
+                <button type="button" class="toggle" aria-pressed="true" value="opfs">OPFS</button>
+                <button type="button" class="toggle" aria-pressed="false" value="file"><span data-t="demo.backendFile"></span></button>
+              </div>
+              <figure class="st-hex st-matrix card dark" data-backend-view aria-labelledby="hex-caption">
+              <figcaption class="st-hex-head"><span id="hex-caption"><svg class="st-icon" aria-hidden="true"><use href="#i-file"/></svg> journal.log</span><span class="badge" data-variant="outline" data-size-label></span></figcaption>
+              <div class="st-hex-body" data-hex aria-live="off"></div>
+              <p class="st-hex-foot" data-t="persist.hexFoot"></p>
+            </figure>
+              <div class="mk-empty-state st-backend-note" data-variant="dashed" data-backend-note="file" hidden>
+                <span class="mk-empty-state-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-terminal"/></svg></span>
+                <h4 class="mk-empty-state-title" data-t="demo.fileNoteTitle"></h4>
+                <p class="mk-empty-state-text" data-t="demo.fileNoteText"></p>
+                <p class="mk-empty-state-text" data-folder-offer hidden data-t="demo.pickNote"></p>
+                <div class="mk-empty-state-actions">
+                  <button type="button" class="btn" data-size="sm" data-pick-folder data-folder-offer hidden><svg class="st-icon" aria-hidden="true"><use href="#i-file"/></svg><span data-t="demo.pickFolder"></span></button>
+                  <a class="btn" data-variant="outline" data-size="sm" href="#use-node" data-t="demo.fileNoteAction"></a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Seek -->
+        <div class="tab-content" role="tabpanel" id="panel-seek" aria-labelledby="tab-seek" tabindex="0" hidden>
+          <div class="st-demo-grid" data-demo="seek">
+            <div class="st-demo-side">
+              <h3 class="st-demo-title" id="seek"><a class="heading-anchor" href="#seek" data-ta="aria-label:anchor.seek">#</a><span data-t="seek.title"></span></h3>
+              <p class="st-demo-text" data-t="seek.text"></p>
+              <div class="st-row" data-backend-controls>
+                <label class="sr-only" for="seek-records" data-t="seek.recordsLabel"></label>
+                <select class="select st-seek-records" id="seek-records" name="records" data-size="sm">
+                  <option value="100000" data-ta="label:seek.r100k"></option>
+                  <option value="250000" data-ta="label:seek.r250k"></option>
+                  <option value="1000000" selected data-ta="label:seek.r1m"></option>
+                </select>
+                <button type="button" class="btn" data-size="sm" data-action="generate"><svg class="st-icon" aria-hidden="true"><use href="#i-play"/></svg><span data-t="seek.generate"></span></button>
+              </div>
+              <progress class="progress" max="1" value="0" data-progress hidden data-ta="aria-label:seek.progress"></progress>
+              <dl class="st-seek-stats">
+                <div class="st-seek-stat"><dt data-t="seek.statRecords"></dt><dd data-stat="records">0</dd></div>
+                <div class="st-seek-stat"><dt data-t="seek.statSize"></dt><dd data-stat="size">0 B</dd></div>
+                <div class="st-seek-stat"><dt data-t="seek.statWrite"></dt><dd data-stat="write">0/s</dd></div>
+                <div class="st-seek-stat"><dt data-t="seek.statSeek"></dt><dd data-stat="seek">0 µs</dd></div>
+              </dl>
+              <div class="mockup-code st-code st-code-small" data-variant="outline" data-chrome="none" data-wrap data-snippet="seek"></div>
+            </div>
+            <div class="st-backend-col">
+              <div class="toggle-group st-backend" role="group" data-type="single" data-variant="outline" data-size="sm" data-ta="aria-label:demo.backend">
+                <button type="button" class="toggle" aria-pressed="false" value="memory"><span data-t="demo.backendMemory"></span></button>
+                <button type="button" class="toggle" aria-pressed="true" value="opfs">OPFS</button>
+                <button type="button" class="toggle" aria-pressed="false" value="file"><span data-t="demo.backendFile"></span></button>
+              </div>
+            <!-- A deliberate dark terminal in both themes: the toolbar seeks, the list below shows the file. -->
+            <div class="st-seek-view st-matrix dark" data-backend-view>
+              <form class="st-seek-jump">
+                <svg class="st-icon" aria-hidden="true"><use href="#i-search"/></svg>
+                <label class="sr-only" for="seek-index" data-t="seek.jumpLabel"></label>
+                <input class="input" id="seek-index" name="index" type="number" min="0" inputmode="numeric" autocomplete="off" data-size="sm" data-ta="placeholder:seek.jumpPlaceholder">
+                <button class="btn" type="submit" data-variant="outline" data-size="sm"><span data-t="seek.jump"></span><kbd class="kbd" data-size="sm">Enter</kbd></button>
+              </form>
+              <div class="virtual-list st-seek-list" id="seek-list" data-ta="aria-label:seek.listLabel"></div>
+            </div>
+              <div class="mk-empty-state st-backend-note" data-variant="dashed" data-backend-note="file" hidden>
+                <span class="mk-empty-state-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-terminal"/></svg></span>
+                <h4 class="mk-empty-state-title" data-t="demo.fileNoteTitle"></h4>
+                <p class="mk-empty-state-text" data-t="demo.fileNoteText"></p>
+                <p class="mk-empty-state-text" data-folder-offer hidden data-t="demo.pickNote"></p>
+                <div class="mk-empty-state-actions">
+                  <button type="button" class="btn" data-size="sm" data-pick-folder data-folder-offer hidden><svg class="st-icon" aria-hidden="true"><use href="#i-file"/></svg><span data-t="demo.pickFolder"></span></button>
+                  <a class="btn" data-variant="outline" data-size="sm" href="#use-node" data-t="demo.fileNoteAction"></a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ownership -->
+        <div class="tab-content" role="tabpanel" id="panel-owner" aria-labelledby="tab-owner" tabindex="0" hidden>
+          <div class="st-demo-grid st-owner" data-demo="owner">
+            <div class="st-demo-side">
+              <h3 class="st-demo-title" id="ownership"><a class="heading-anchor" href="#ownership" data-ta="aria-label:anchor.ownership">#</a><span data-t="owner.title"></span></h3>
+              <p class="st-demo-text" data-t="owner.text"></p>
+              <ol class="st-owner-log" aria-live="polite" data-ta="aria-label:owner.log"></ol>
+              <p class="st-demo-note" data-t="owner.note"></p>
+            </div>
+            <div class="st-backend-col">
+              <div class="toggle-group st-backend" role="group" data-type="single" data-variant="outline" data-size="sm" data-ta="aria-label:demo.backend">
+                <button type="button" class="toggle" aria-pressed="false" value="memory"><span data-t="demo.backendMemory"></span></button>
+                <button type="button" class="toggle" aria-pressed="true" value="opfs">OPFS</button>
+                <button type="button" class="toggle" aria-pressed="false" value="file"><span data-t="demo.backendFile"></span></button>
+              </div>
+            <div class="st-owner-stage" data-backend-view>
+              <section class="card st-worker" data-worker="a" aria-labelledby="worker-a">
+                <h4 class="st-worker-name" id="worker-a"><svg class="st-icon" aria-hidden="true"><use href="#i-cpu"/></svg><span data-t="owner.workerA"></span></h4>
+                <p class="badge st-worker-state" data-variant="outline" data-state="idle" aria-live="polite"></p>
+                <div class="st-row">
+                  <button type="button" class="btn" data-size="sm" data-action="open" data-t="owner.open"></button>
+                  <button type="button" class="btn" data-variant="outline" data-size="sm" data-action="close" data-t="owner.close"></button>
+                  <button type="button" class="btn" data-variant="destructive" data-size="sm" data-action="terminate" data-t="owner.terminate"></button>
+                </div>
+              </section>
+              <div class="st-owner-file" aria-hidden="true">
+                <svg class="st-owner-lock" viewBox="0 0 24 24"><use href="#i-lock"/></svg>
+                <span class="st-owner-name">shared.bin</span>
+                <span class="st-owner-beam"></span>
+              </div>
+              <section class="card st-worker" data-worker="b" aria-labelledby="worker-b">
+                <h4 class="st-worker-name" id="worker-b"><svg class="st-icon" aria-hidden="true"><use href="#i-cpu"/></svg><span data-t="owner.workerB"></span></h4>
+                <p class="badge st-worker-state" data-variant="outline" data-state="idle" aria-live="polite"></p>
+                <div class="st-row">
+                  <button type="button" class="btn" data-size="sm" data-action="open" data-t="owner.open2"></button>
+                  <button type="button" class="btn" data-variant="outline" data-size="sm" data-action="close" data-t="owner.close2"></button>
+                  <button type="button" class="btn" data-variant="destructive" data-size="sm" data-action="terminate" data-t="owner.terminate2"></button>
+                </div>
+              </section>
+            </div>
+              <div class="mk-empty-state st-backend-note" data-variant="dashed" data-backend-note="memory" hidden>
+                <span class="mk-empty-state-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-cpu"/></svg></span>
+                <h4 class="mk-empty-state-title" data-t="demo.memoryNoteTitle"></h4>
+                <p class="mk-empty-state-text" data-t="demo.memoryNoteText"></p>
+              </div>
+              <div class="mk-empty-state st-backend-note" data-variant="dashed" data-backend-note="file" hidden>
+                <span class="mk-empty-state-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-terminal"/></svg></span>
+                <h4 class="mk-empty-state-title" data-t="demo.fileNoteTitle"></h4>
+                <p class="mk-empty-state-text" data-t="demo.fileNoteText"></p>
+                <p class="mk-empty-state-text" data-folder-offer hidden data-t="demo.pickNote"></p>
+                <div class="mk-empty-state-actions">
+                  <button type="button" class="btn" data-size="sm" data-pick-folder data-folder-offer hidden><svg class="st-icon" aria-hidden="true"><use href="#i-file"/></svg><span data-t="demo.pickFolder"></span></button>
+                  <a class="btn" data-variant="outline" data-size="sm" href="#use-node" data-t="demo.fileNoteAction"></a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Limits -->
+        <div class="tab-content" role="tabpanel" id="panel-limits" aria-labelledby="tab-limits" tabindex="0" hidden>
+          <div class="st-demo-grid" data-demo="limits">
+            <div class="st-demo-side">
+              <h3 class="st-demo-title" id="backpressure"><a class="heading-anchor" href="#backpressure" data-ta="aria-label:anchor.backpressure">#</a><span data-t="limits.title"></span></h3>
+              <p class="st-demo-text" data-t="limits.text"></p>
+              <div class="st-fields" data-backend-controls>
+                <label class="st-field"><span class="st-field-label"><span data-t="limits.calls"></span> <output data-out="calls">64</output></span><input class="slider" type="range" name="calls" min="8" max="256" step="8" value="64"></label>
+                <label class="st-field"><span class="st-field-label"><span data-t="limits.ops"></span> <output data-out="ops">64</output></span><input class="slider" type="range" name="ops" min="1" max="256" step="1" value="64"></label>
+                <label class="st-field"><span class="st-field-label" data-t="limits.chunk"></span>
+                  <select class="select" name="chunk" data-size="sm"><option value="4096">4 KiB</option><option value="65536" selected>64 KiB</option><option value="1048576">1 MiB</option></select></label>
+                <label class="st-field"><span class="st-field-label" data-t="limits.bytes"></span>
+                  <select class="select" name="bytes" data-size="sm"><option value="262144">256 KiB</option><option value="1048576">1 MiB</option><option value="4194304" selected>4 MiB</option><option value="67108864">64 MiB</option></select></label>
+              </div>
+              <div class="st-row" data-backend-controls>
+                <button type="button" class="btn" data-action="fire"><svg class="st-icon" aria-hidden="true"><use href="#i-play"/></svg><span data-t="limits.fire"></span></button>
+                <button type="button" class="btn" data-variant="outline" data-action="chunks" data-t="limits.chunks"></button>
+              </div>
+            </div>
+            <div class="st-backend-col">
+              <div class="toggle-group st-backend" role="group" data-type="single" data-variant="outline" data-size="sm" data-ta="aria-label:demo.backend">
+                <button type="button" class="toggle" aria-pressed="false" value="memory"><span data-t="demo.backendMemory"></span></button>
+                <button type="button" class="toggle" aria-pressed="true" value="opfs">OPFS</button>
+                <button type="button" class="toggle" aria-pressed="false" value="file"><span data-t="demo.backendFile"></span></button>
+              </div>
+            <div class="st-limits-view" data-backend-view>
+              <div class="st-cells" data-cells role="img" data-ta="aria-label:limits.cellsLabel"></div>
+              <div class="st-legend"><span class="st-legend-item"><i class="st-cell" data-state="ok"></i><span data-t="limits.legendOk"></span></span><span class="st-legend-item"><i class="st-cell" data-state="full"></i><span data-t="limits.legendFull"></span></span><span class="st-legend-item"><i class="st-cell"></i><span data-t="limits.legendIdle"></span></span></div>
+              <div class="mockup-code st-code st-code-small" data-variant="outline" data-chrome="none" data-wrap data-snippet="limits-fire" data-limits-code="fire"></div>
+              <div class="mockup-code st-code st-code-small" data-variant="outline" data-chrome="none" data-wrap data-snippet="limits-chunks" data-limits-code="chunks" hidden></div>
+            </div>
+              <div class="mk-empty-state st-backend-note" data-variant="dashed" data-backend-note="file" hidden>
+                <span class="mk-empty-state-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-terminal"/></svg></span>
+                <h4 class="mk-empty-state-title" data-t="demo.fileNoteTitle"></h4>
+                <p class="mk-empty-state-text" data-t="demo.fileNoteText"></p>
+                <p class="mk-empty-state-text" data-folder-offer hidden data-t="demo.pickNote"></p>
+                <div class="mk-empty-state-actions">
+                  <button type="button" class="btn" data-size="sm" data-pick-folder data-folder-offer hidden><svg class="st-icon" aria-hidden="true"><use href="#i-file"/></svg><span data-t="demo.pickFolder"></span></button>
+                  <a class="btn" data-variant="outline" data-size="sm" href="#use-node" data-t="demo.fileNoteAction"></a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Playground -->
+        <div class="tab-content" role="tabpanel" id="panel-playground" aria-labelledby="tab-playground" tabindex="0" hidden>
+          <div class="st-playground" data-demo="playground">
+            <div class="st-playground-head">
+              <h3 class="st-demo-title" id="playground"><a class="heading-anchor" href="#playground" data-ta="aria-label:anchor.playground">#</a><span data-t="play.title"></span></h3>
+              <p class="st-demo-text" data-t="play.text"></p>
+            </div>
+            <div class="st-demo-grid st-play-grid">
+            <div class="st-demo-side">
+            <div class="st-row st-playground-bar">
+              <label class="sr-only" for="play-preset" data-t="play.presetLabel"></label>
+              <select class="select" id="play-preset" data-size="sm">
+                <option value="chunks" data-ta="label:play.preset.chunks"></option>
+                <option value="owner" data-ta="label:play.preset.owner"></option>
+                <option value="stream" data-ta="label:play.preset.stream"></option>
+                <option value="errors" data-ta="label:play.preset.errors"></option>
+              </select>
+              <span class="st-spacer"></span>
+              <button type="button" class="btn" data-variant="ghost" data-size="sm" data-action="reset"><svg class="st-icon" aria-hidden="true"><use href="#i-reset"/></svg><span data-t="play.reset"></span></button>
+              <button type="button" class="btn" data-size="sm" data-action="run"><svg class="st-icon" aria-hidden="true"><use href="#i-play"/></svg><span data-t="play.run"></span><kbd class="kbd-group"><kbd class="kbd" data-size="sm" data-mod>Ctrl</kbd><kbd class="kbd" data-size="sm">Enter</kbd></kbd></button>
+            </div>
+            <div class="st-editor" data-editor>
+              <div class="code-example-panel">
+                <button type="button" class="code-example-copy" data-copy-editor><svg class="st-icon" aria-hidden="true"><use href="#i-copy"/></svg><span data-t="play.copy"></span></button>
+                <div class="code-example-editor">
+                  <div class="code-example-paint" aria-hidden="true"></div>
+                  <textarea class="code-example-src" spellcheck="false" rows="18" data-ta="aria-label:play.source"></textarea>
+                </div>
+              </div>
+            </div>
+            </div>
+            <div class="st-demo-side">
+            <div class="mockup-code st-console" data-variant="outline" data-chrome="mac" data-title="console" data-wrap data-console aria-live="off"><pre data-prefix=">" data-tone="muted"><code data-t="play.idle"></code></pre></div>
+            </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="performance" class="st-section parallax-reveal" aria-labelledby="perf-title">
+    <header class="mk-section-header" data-variant="split">
+      <div class="mk-section-header-copy">
+        <span class="mk-section-header-eyebrow" data-t="perf.eyebrow"></span>
+        <h2 class="mk-section-header-title st-display" id="perf-title"><a class="heading-anchor" href="#performance" data-ta="aria-label:anchor.performance">#</a><span data-t="perf.title"></span></h2>
+        <p class="mk-section-header-desc" data-t="perf.desc"></p>
+      </div>
+      <div class="mk-section-header-actions">
+        <a class="btn" data-variant="outline" href="#run"><svg class="st-icon" aria-hidden="true"><use href="#i-gauge"/></svg><span data-t="perf.runYours"></span></a>
+      </div>
+    </header>
+    <div class="st-explorer card" data-explorer="home">
+      <div class="st-explorer-bar">
+        <div class="st-control"><span class="st-control-label" data-t="chart.runtime"></span>
+          <div class="toggle-group" role="group" data-type="single" data-variant="outline" data-size="sm" data-control="env" data-ta="aria-label:chart.runtime">
+            <button type="button" class="toggle" aria-pressed="false" value="node">Node.js</button>
+            <button type="button" class="toggle" aria-pressed="false" value="bun">Bun</button>
+            <button type="button" class="toggle" aria-pressed="true" value="chromium">Chromium</button>
+            <button type="button" class="toggle" aria-pressed="false" value="firefox">Firefox</button>
+            <button type="button" class="toggle" aria-pressed="false" value="webkit">WebKit</button>
+          </div>
+        </div>
+        <div class="st-control"><span class="st-control-label" data-t="chart.operation"></span>
+          <div class="toggle-group" role="group" data-type="single" data-variant="outline" data-size="sm" data-control="metric" data-ta="aria-label:chart.operation">
+            <button type="button" class="toggle" aria-pressed="true" value="append"><span data-t="chart.mAppend"></span></button>
+            <button type="button" class="toggle" aria-pressed="false" value="pipelined"><span data-t="chart.mPipelined"></span></button>
+            <button type="button" class="toggle" aria-pressed="false" value="stream"><span data-t="chart.mStream"></span></button>
+            <button type="button" class="toggle" aria-pressed="false" value="streamChecksum"><span data-t="chart.mChecksum"></span></button>
+            <button type="button" class="toggle" aria-pressed="false" value="readInto"><span data-t="chart.mReads"></span></button>
+          </div>
+        </div>
+        <div class="st-control" data-adapter-control hidden><span class="st-control-label" data-t="chart.adapter"></span>
+          <div class="toggle-group" role="group" data-type="single" data-variant="outline" data-size="sm" data-control="adapter" data-ta="aria-label:chart.adapter">
+            <button type="button" class="toggle" aria-pressed="true" value="file"><span data-t="chart.aFile"></span></button>
+            <button type="button" class="toggle" aria-pressed="false" value="memory"><span data-t="chart.aMemory"></span></button>
+          </div>
+        </div>
+      </div>
+      <div class="chart" data-size="lg" data-chart-id="explorer" role="img" data-ta="aria-label:chart.label"></div>
+      <p class="st-nojs" data-t="chart.nojs"></p>
+      <p class="st-chart-note" data-chart-note aria-live="polite"></p>
+      <div class="table-container st-explorer-table"><table class="table" data-explorer-table>
+        <caption class="table-caption sr-only" data-t="chart.tableCaption"></caption>
+        <thead><tr class="table-row"><th class="table-head" scope="col" data-t="chart.colChunk"></th><th class="table-head" scope="col" data-t="chart.colAppend"></th><th class="table-head" scope="col" data-t="chart.colPipelined"></th><th class="table-head" scope="col" data-t="chart.colStream"></th><th class="table-head" scope="col" data-t="chart.colChecksum"></th><th class="table-head" scope="col" data-t="chart.colReadInto"></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+    <div class="st-highlights" data-highlights></div>
+  </section>
+
+  <section id="run" class="st-section parallax-reveal" aria-labelledby="run-title">
+    <div class="card st-run" data-demo="speed">
+      <div class="card-header">
+        <h2 class="card-title st-display" id="run-title"><a class="heading-anchor" href="#run" data-ta="aria-label:anchor.run">#</a><span class="text-rotate st-accent-text" data-effect="fade" style="--text-rotate-duration:8s" data-t="run.rotate"></span></h2>
+        <p class="card-description" data-t="run.desc"></p>
+      </div>
+      <div class="card-content st-run-body">
+        <div class="st-row">
+          <button type="button" class="btn" data-size="lg" data-action="bench"><svg class="st-icon" aria-hidden="true"><use href="#i-play"/></svg><span data-t="run.start"></span></button>
+        </div>
+        <progress class="progress" max="100" value="0" data-progress data-ta="aria-label:run.progress"></progress>
+        <p class="st-status" role="status" aria-live="polite" data-status></p>
+        <p class="st-run-engine" data-engine hidden></p>
+        <div class="chart" data-chart-id="run" role="img" data-ta="aria-label:run.chartLabel" hidden></div>
+        <div class="table-container"><table class="table st-run-table" hidden>
+          <thead><tr class="table-row"><th class="table-head" scope="col" data-t="run.colCase"></th><th class="table-head" scope="col" data-t="run.colYours"></th><th class="table-head" scope="col" data-t="run.colRecorded"></th></tr></thead>
+          <tbody data-run-rows></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="options" class="st-section parallax-reveal" aria-labelledby="options-title">
+    <h2 class="st-h2 st-display" id="options-title"><a class="heading-anchor" href="#options" data-ta="aria-label:anchor.options">#</a><span data-t="options.title"></span></h2>
+    <p class="st-lead" data-t="options.desc"></p>
+    <figure class="chart-frame card st-chart-card">
+      <div class="chart" data-size="lg" data-chart-id="options" role="img" data-ta="aria-label:options.label"></div>
+      <p class="st-nojs" data-t="chart.nojs"></p>
+      <figcaption class="chart-source" data-t="options.source"></figcaption>
+    </figure>
+  </section>
+
+  <section id="overload" class="st-section parallax-reveal" aria-labelledby="overload-title">
+    <div class="st-two">
+      <div>
+        <h2 class="st-h2 st-display" id="overload-title"><a class="heading-anchor" href="#overload" data-ta="aria-label:anchor.overload">#</a><span data-t="overload.title"></span></h2>
+        <p class="st-lead" data-t="overload.desc"></p>
+      </div>
+      <figure class="chart-frame card st-chart-card">
+        <div class="chart" data-size="sm" data-chart-id="overload" role="img" data-ta="aria-label:overload.label"></div>
+        <p class="st-nojs" data-t="chart.nojs"></p>
+      </figure>
+    </div>
+  </section>
+
+  <section id="large" class="st-section parallax-reveal" aria-labelledby="large-title">
+    <div class="st-two">
+      <div>
+        <h2 class="st-h2 st-display" id="large-title"><a class="heading-anchor" href="#large" data-ta="aria-label:anchor.large">#</a><span data-t="large.title"></span></h2>
+        <p class="st-lead" data-t="large.desc"></p>
+      </div>
+      <div class="st-large-col">
+        <ul class="st-large-stats">
+          <li class="st-large-stat"><span class="st-large-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-file"/></svg></span><span class="st-large-text"><span class="st-large-value">{{largeMiB}}</span><span class="st-large-label" data-t="large.file"></span></span><span class="st-large-bar" style="--share:100%" aria-hidden="true"></span></li>
+          <li class="st-large-stat"><span class="st-large-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-cpu"/></svg></span><span class="st-large-text"><span class="st-large-value">{{heapMiB}}</span><span class="st-large-label" data-t="large.heap"></span></span><span class="st-large-bar" style="--share:{{heapShare}}" aria-hidden="true"></span></li>
+          <li class="st-large-stat" data-tone="accent"><span class="st-large-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-gauge"/></svg></span><span class="st-large-text"><span class="st-large-value">{{rssMB}}</span><span class="st-large-label" data-t="large.rss"></span></span><span class="st-large-bar" style="--share:{{rssShare}}" aria-hidden="true"></span></li>
+        </ul>
+        <p class="st-large-note" data-t="large.note"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="method" class="st-section parallax-reveal" aria-labelledby="method-title">
+    <h2 class="st-h2 st-display" id="method-title"><a class="heading-anchor" href="#method" data-ta="aria-label:anchor.method">#</a><span data-t="method.title"></span></h2>
+    <p class="st-lead st-method" data-t="method.text"></p>
+    <div class="mockup-code st-code" data-variant="outline" data-chrome="none" data-snippet="bench"></div>
+  </section>
+
+  <section id="quality" class="st-section parallax-reveal" aria-labelledby="quality-title">
+    <div class="corner-leaf pattern-dots st-quality">
+      <header class="mk-section-header">
+        <div class="mk-section-header-copy">
+          <span class="mk-section-header-eyebrow" data-t="quality.eyebrow"></span>
+          <h2 class="mk-section-header-title st-display" id="quality-title"><a class="heading-anchor" href="#quality" data-ta="aria-label:anchor.quality">#</a><span data-t="quality.title"></span></h2>
+          <p class="mk-section-header-desc" data-t="quality.desc"></p>
+        </div>
+      </header>
+      <div class="st-quality-grid">
+        <figure class="chart-frame st-chart-card">
+          <h3 class="chart-title" data-t="quality.sizeTitle"></h3>
+          <p class="chart-dek" data-t="quality.sizeDek"></p>
+          <div class="chart" data-size="sm" data-chart-id="sizes" role="img" data-ta="aria-label:quality.sizeLabel"></div>
+          <p class="st-nojs" data-t="chart.nojs"></p>
+        </figure>
+        <div class="st-tests st-rings">
+          <div class="st-test"><div class="radial-progress" role="meter" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="--value:100" data-ta="aria-label:quality.nodeRing">148</div><span class="st-test-label" data-t="quality.node"></span></div>
+          <div class="st-test"><div class="radial-progress" role="meter" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="--value:100" data-ta="aria-label:quality.browsersRing">216</div><span class="st-test-label" data-t="quality.browsers"></span></div>
+          <div class="st-test"><div class="radial-progress" role="meter" aria-valuenow="99.15" aria-valuemin="0" aria-valuemax="100" style="--value:99.15" data-ta="aria-label:quality.coverageRing">99%</div><span class="st-test-label" data-t="quality.coverage"></span></div>
+          <div class="st-test"><div class="radial-progress" role="meter" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="--value:0" data-ta="aria-label:quality.depsRing">0</div><span class="st-test-label" data-t="quality.deps"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="consulting" class="st-section parallax-reveal">
+    <div class="corner-leaf-reverse pattern-mesh st-consult">
+      <section class="mk-cta" data-variant="split" aria-labelledby="consult-title">
+        <div class="mk-cta-inner">
+          <div class="mk-cta-copy">
+            <div class="st-cta-head">
+              <div class="aura aura-glow aura-gold st-portrait" style="--shape-round:1.25rem"><img class="shape-squircle" src="/aron-homberg.jpg" width="400" height="400" loading="lazy" data-ta="alt:consult.portrait"></div>
+              <h2 class="mk-cta-title" id="consult-title" data-t="consult.title"></h2>
+            </div>
+            <p class="mk-cta-desc" data-t="consult.desc"></p>
+          </div>
+          <div class="mk-cta-actions">
+            <a class="btn" data-size="lg" href="https://www.linkedin.com/in/aronhomberg/" target="_blank" rel="noopener"><svg class="st-icon st-icon-fill" aria-hidden="true"><use href="#i-linkedin"/></svg><span data-t="consult.cta"></span><svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <section id="install" class="st-section parallax-reveal" aria-labelledby="install-title">
+    <div class="corner-leaf pattern-dots st-use">
+      <header class="mk-section-header">
+        <div class="mk-section-header-copy">
+          <span class="mk-section-header-eyebrow" data-t="install.eyebrow"></span>
+          <h2 class="mk-section-header-title st-display" id="install-title"><a class="heading-anchor" href="#install" data-ta="aria-label:anchor.install">#</a><span data-t="install.title"></span></h2>
+          <p class="mk-section-header-desc" data-t="install.desc"></p>
+        </div>
+      </header>
+      <div class="tabs st-use-tabs">
+        <div class="tab-list" role="tablist" data-ta="aria-label:install.examples">
+          <button class="tab-trigger" role="tab" aria-selected="true" aria-controls="use-browser" id="use-tab-browser" data-t="install.tab.browser"></button>
+          <button class="tab-trigger" role="tab" aria-selected="false" aria-controls="use-node" id="use-tab-node" tabindex="-1" data-t="install.tab.node"></button>
+          <button class="tab-trigger" role="tab" aria-selected="false" aria-controls="use-memory" id="use-tab-memory" tabindex="-1" data-t="install.tab.memory"></button>
+          <button class="tab-trigger" role="tab" aria-selected="false" aria-controls="use-agent" id="use-tab-agent" tabindex="-1" data-t="install.tab.agent"></button>
+        </div>
+        <div class="tab-content" role="tabpanel" id="use-browser" aria-labelledby="use-tab-browser" tabindex="0">
+          <p class="st-use-text" data-t="install.browserText"></p>
+          <div class="st-use-pair">
+            <div class="mockup-code st-code" data-variant="outline" data-chrome="mac" data-title="storage.worker.js" data-numbers data-wrap data-snippet="use-worker"></div>
+            <div class="mockup-code st-code" data-variant="outline" data-chrome="mac" data-title="main.js" data-numbers data-wrap data-snippet="use-main"></div>
+          </div>
+        </div>
+        <div class="tab-content" role="tabpanel" id="use-node" aria-labelledby="use-tab-node" tabindex="0" hidden>
+          <p class="st-use-text" data-t="install.nodeText"></p>
+          <div class="mockup-code st-code" data-variant="outline" data-chrome="mac" data-title="ingest.js" data-numbers data-snippet="use-node"></div>
+        </div>
+        <div class="tab-content" role="tabpanel" id="use-memory" aria-labelledby="use-tab-memory" tabindex="0" hidden>
+          <p class="st-use-text" data-t="install.memoryText"></p>
+          <div class="mockup-code st-code" data-variant="outline" data-chrome="mac" data-title="log.test.js" data-numbers data-snippet="use-memory"></div>
+        </div>
+        <div class="tab-content" role="tabpanel" id="use-agent" aria-labelledby="use-tab-agent" tabindex="0" hidden>
+          <p class="st-use-text" data-t="install.agentText"></p>
+          <div class="st-prompt">
+            <div class="mockup-code" data-variant="outline" data-chrome="mac" data-title="coding agent" data-wrap data-agent-prompt>
+              <pre data-prefix=">"><code data-t="install.prompt1"></code></pre>
+              <pre data-prefix=""><code data-t="install.prompt2"></code></pre>
+              <pre data-prefix=""><code data-t="install.prompt3"></code></pre>
+              <pre data-prefix=""><code data-t="install.prompt4"></code></pre>
+            </div>
+            <button type="button" class="btn st-copy" data-variant="secondary" data-size="sm" data-copy-prompt><svg class="st-icon" aria-hidden="true"><use href="#i-copy"/></svg><span data-t="install.copyPrompt"></span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="api" class="st-section parallax-reveal" aria-labelledby="api-title">
+    <header class="mk-section-header">
+      <div class="mk-section-header-copy">
+        <span class="mk-section-header-eyebrow" data-t="api.eyebrow"></span>
+        <h2 class="mk-section-header-title st-display" id="api-title"><a class="heading-anchor" href="#api" data-ta="aria-label:anchor.api">#</a><span data-t="api.title"></span></h2>
+        <p class="mk-section-header-desc" data-t="api.desc"></p>
+      </div>
+    </header>
+    <div class="st-api">
+      <div class="table-container st-api-table">
+        <table class="table">
+          <thead><tr class="table-row"><th class="table-head" scope="col" data-t="api.colCall"></th><th class="table-head" scope="col" data-t="api.colWhat"></th></tr></thead>
+          <tbody>
+            <tr class="table-row"><td class="table-cell"><code>open(name, options)</code></td><td class="table-cell" data-t="api.open"></td></tr>
+            <tr class="table-row"><td class="table-cell"><code>append(bytes)</code></td><td class="table-cell" data-t="api.append"></td></tr>
+            <tr class="table-row"><td class="table-cell"><code>write(offset, bytes)</code></td><td class="table-cell" data-t="api.write"></td></tr>
+            <tr class="table-row"><td class="table-cell"><code>readExactly(offset, length)</code></td><td class="table-cell" data-t="api.readExactly"></td></tr>
+            <tr class="table-row"><td class="table-cell"><code>readInto(offset, target)</code></td><td class="table-cell" data-t="api.readInto"></td></tr>
+            <tr class="table-row"><td class="table-cell"><code>stream({ start, end, chunkSize })</code></td><td class="table-cell" data-t="api.stream"></td></tr>
+            <tr class="table-row"><td class="table-cell"><code>truncate(size)</code></td><td class="table-cell" data-t="api.truncate"></td></tr>
+            <tr class="table-row"><td class="table-cell"><code>flush()</code></td><td class="table-cell" data-t="api.flush"></td></tr>
+            <tr class="table-row"><td class="table-cell"><code>close()</code></td><td class="table-cell" data-t="api.close"></td></tr>
+            <tr class="table-row"><td class="table-cell"><code>appendChunks(file, source)</code></td><td class="table-cell" data-t="api.appendChunks"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <aside class="st-errors card" aria-labelledby="errors-title">
+        <h3 id="errors-title"><a class="heading-anchor" href="#errors-title" data-ta="aria-label:anchor.errors">#</a><span data-t="api.errorsTitle"></span></h3>
+        <p data-t="api.errorsText"></p>
+        <ul class="st-badges">
+          <li><span class="badge" data-variant="outline">NOT_FOUND</span></li><li><span class="badge" data-variant="outline">ALREADY_EXISTS</span></li>
+          <li><span class="badge" data-variant="outline">BUSY</span></li><li><span class="badge" data-variant="outline">CLOSED</span></li>
+          <li><span class="badge" data-variant="outline">READ_ONLY</span></li><li><span class="badge" data-variant="outline">PERMISSION_DENIED</span></li>
+          <li><span class="badge" data-variant="outline">QUOTA_EXCEEDED</span></li><li><span class="badge" data-variant="outline">UNEXPECTED_EOF</span></li>
+          <li><span class="badge" data-variant="outline">UNSUPPORTED</span></li><li><span class="badge" data-variant="outline">ABORTED</span></li>
+          <li><span class="badge" data-variant="outline">QUEUE_FULL</span></li><li><span class="badge" data-variant="outline">IO_ERROR</span></li>
+        </ul>
+        <div class="mockup-code st-code st-code-small" data-variant="outline" data-chrome="none" data-wrap data-snippet="errors"></div>
+      </aside>
+    </div>
+  </section>
+
+  <div class="st-section parallax-reveal" data-reveal="zoom">
+    <section class="mk-cta" data-variant="dark" aria-labelledby="cta-title">
+      <div class="mk-cta-inner">
+        <div class="mk-cta-copy">
+          <h2 class="mk-cta-title" id="cta-title" data-t="cta.title"></h2>
+          <p class="mk-cta-desc" data-t="cta.desc"></p>
+        </div>
+        <div class="mk-cta-actions">
+          <a class="btn" data-size="lg" href="https://github.com/kyr0/defuss-storage" target="_blank" rel="noopener"><svg class="st-icon" aria-hidden="true"><use href="#i-github"/></svg><span data-t="cta.github"></span><svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a>
+          <a class="btn" data-variant="outline" data-size="lg" href="https://www.npmjs.com/package/defuss-storage" target="_blank" rel="noopener"><span data-t="cta.npm"></span><svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a>
+        </div>
+        <p class="mk-cta-note" data-t="cta.note"></p>
+      </div>
+    </section>
+  </div>
+  </div>
+
+  <!-- =============================== MISSING ============================== -->
+  <div class="st-view" data-view="missing" hidden data-i18n-component>
+    <section class="mk-empty-state st-missing" aria-labelledby="missing-title">
+      <span class="mk-empty-state-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-file"/></svg></span>
+      <h1 class="mk-empty-state-title" id="missing-title" data-t="missing.title"></h1>
+      <p class="mk-empty-state-text" data-t="missing.text"></p>
+      <div class="mk-empty-state-actions">
+        <a class="btn" data-router-link href="/{lang}/" data-t="missing.home"></a>
+        <a class="btn" data-variant="outline" data-router-link href="/{lang}/#performance" data-t="missing.bench"></a>
+      </div>
+    </section>
+  </div>
+  </main>
+
+  <footer class="mk-footer st-footer" data-i18n-component>
+    <div class="mk-footer-inner">
+      <nav class="mk-footer-nav st-footer-nav" data-ta="aria-label:footer.label">
+        <div class="mk-footer-col">
+          <h3 class="mk-footer-heading" data-t="footer.project"></h3>
+          <ul class="mk-footer-list">
+            <li><a href="https://github.com/kyr0/defuss-storage" target="_blank" rel="noopener"><span data-t="footer.source"></span><svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a></li>
+            <li><a href="https://github.com/kyr0/defuss-storage/blob/main/CHANGELOG.md" target="_blank" rel="noopener"><span data-t="footer.changelog"></span><svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a></li>
+            <li><a href="https://github.com/kyr0/defuss-storage/blob/main/VALIDATION.md" target="_blank" rel="noopener"><span data-t="footer.validation"></span><svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a></li>
+            <li><a href="https://github.com/kyr0/defuss-storage/blob/main/ARCH.md" target="_blank" rel="noopener"><span data-t="footer.arch"></span><svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a></li>
+          </ul>
+        </div>
+        <div class="mk-footer-col">
+          <h3 class="mk-footer-heading" data-t="footer.site"></h3>
+          <ul class="mk-footer-list">
+            <li><a data-router-link href="/{lang}/#how" data-t="footer.how"></a></li>
+            <li><a data-router-link href="/{lang}/#demo" data-t="footer.demo"></a></li>
+            <li><a data-router-link href="/{lang}/#performance" data-t="footer.benchmarks"></a></li>
+            <li><a data-router-link href="/{lang}/#install" data-t="footer.install"></a></li>
+            <li><a href="/llms.txt">llms.txt</a></li>
+          </ul>
+        </div>
+        <div class="mk-footer-col">
+          <h3 class="mk-footer-heading" data-t="footer.built"></h3>
+          <ul class="mk-footer-list">
+            <li><a href="https://shadcn.defuss.org" target="_blank" rel="noopener">defuss-shadcn<svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a></li>
+            <li><a href="https://i18n.defuss.org" target="_blank" rel="noopener">defuss-i18n<svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a></li>
+            <li><a href="https://dom-router.defuss.org" target="_blank" rel="noopener">defuss-dom-router<svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a></li>
+            <li><a href="https://vae.defuss.org" target="_blank" rel="noopener">defuss-vae<svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a></li>
+          </ul>
+        </div>
+        <div class="mk-footer-col">
+          <h3 class="mk-footer-heading" data-t="footer.consulting"></h3>
+          <aside class="corner-leaf st-ad" data-ta="aria-label:footer.adLabel">
+            <div class="st-ad-head">
+              <div class="aura aura-glow aura-gold st-ad-portrait" style="--shape-round:1.5rem"><img class="shape-squircle" src="/aron-homberg.jpg" width="400" height="400" loading="lazy" data-ta="alt:consult.portrait2"></div>
+              <div>
+                <p class="st-ad-name">Aron Homberg</p>
+                <p class="st-ad-role" data-t="footer.adRole"></p>
+              </div>
+            </div>
+            <a class="btn" data-size="sm" href="https://www.linkedin.com/in/aronhomberg/" target="_blank" rel="noopener"><svg class="st-icon st-icon-fill" aria-hidden="true"><use href="#i-linkedin"/></svg><span data-t="footer.adCta"></span><svg class="st-icon st-ext" aria-hidden="true"><use href="#i-external"/></svg></a>
+          </aside>
+        </div>
+      </nav>
+      <hr class="separator mk-footer-rule">
+      <div class="mk-footer-bottom">
+        <a href="#top" class="mk-footer-brand" data-ta="aria-label:footer.top"><svg class="st-logo" aria-hidden="true"><use href="#i-logo"/></svg><span class="mk-footer-brand-name">defuss-storage</span></a>
+        <div class="mk-footer-meta"><p class="mk-footer-copy" data-t="footer.copy"></p></div>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<div class="fab" data-scroll-top data-i18n-component>
+  <a class="btn fab-trigger" href="#top" data-ta="aria-label:footer.top2"><span class="fab-icon" aria-hidden="true"><svg class="st-icon"><use href="#i-arrow-up"/></svg></span></a>
+</div>
+
+<dialog id="cmd" class="command" aria-modal="true" data-ta="aria-label:cmd.label" data-i18n-component>
+  <div class="command-content">
+    <div class="command-input-wrapper">
+      <svg class="st-icon" aria-hidden="true"><use href="#i-search"/></svg>
+      <input class="command-input" type="text" autocomplete="off" autocorrect="off" spellcheck="false" data-ta="placeholder:cmd.placeholder;aria-label:cmd.inputLabel">
+    </div>
+    <div class="command-list">
+      <div class="command-group">
+        <p class="command-group-heading" data-t="cmd.sections"></p>
+        <button class="command-item" data-go="/{lang}/#demo" data-t="cmd.demo"></button>
+        <button class="command-item" data-go="/{lang}/#playground" data-t="cmd.playground"></button>
+        <button class="command-item" data-go="/{lang}/#how" data-t="cmd.how"></button>
+        <button class="command-item" data-go="/{lang}/#performance" data-t="cmd.performance"></button>
+        <button class="command-item" data-go="/{lang}/#install" data-t="cmd.install"></button>
+        <button class="command-item" data-go="/{lang}/#api" data-t="cmd.api"></button>
+        <button class="command-item" data-go="/{lang}/#run" data-t="cmd.run"></button>
+      </div>
+      <div class="command-separator"></div>
+      <div class="command-group">
+        <p class="command-group-heading" data-t="cmd.settings"></p>
+        <button class="command-item" data-command="theme" data-t="cmd.theme"></button>
+        <button class="command-item" data-command="locale" data-t="cmd.locale"></button>
+      </div>
+    </div>
+    <div class="command-empty" hidden data-t="cmd.empty"></div>
+  </div>
+</dialog>
+  <div id="toast-container" class="toast-container" role="region" data-position="top-right" data-ta="aria-label:toast.label"></div>
+</body>
+</html>

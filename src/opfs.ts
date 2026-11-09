@@ -9,6 +9,7 @@
  */
 import { ManagedFile } from "./file.js";
 import { StorageError, storageError } from "./errors.js";
+import { acquire, type LockManager } from "./locks.js";
 import { handleLimits, openOptions, validateName, type HandleLimits } from "./validate.js";
 import type { AdapterOptions, OpenOptions, StorageAdapter, StorageFile } from "./types.js";
 
@@ -29,38 +30,9 @@ interface Directory {
   removeEntry(name: string): Promise<void>;
   entries(): AsyncIterableIterator<[string, { kind: string }]>;
 }
-interface LockManager {
-  request(name: string, options: { ifAvailable: true; mode: "exclusive" }, callback: (lock: object | null) => Promise<void>): Promise<void>;
-}
 export interface OPFSStorageOptions extends AdapterOptions {
   /** Namespace below the origin's defuss-storage directory. Default "default". */
   name?: string;
-}
-
-/**
- * Takes the exclusive Web Lock `name` without waiting and returns its release
- * function; rejects BUSY if another context holds it.
- *
- * Why `ifAvailable` instead of queuing: an open of a busy file should fail
- * fast like the other adapters, not hang until the owner closes. VERIFIED:
- * (two-worker 'busy' task) open and remove reject BUSY while another worker owns the file. The lock is
- * held for as long as the callback's promise is pending, so the callback
- * awaits `held`, which only the returned release function resolves.
- */
-async function acquire(locks: LockManager, name: string): Promise<() => Promise<void>> {
-  let unlock!: () => void;
-  let resolve!: () => void;
-  let reject!: (reason: unknown) => void;
-  const held = new Promise<void>(r => { unlock = r; });
-  const acquired = new Promise<void>((yes, no) => { resolve = yes; reject = no; });
-  const request = locks.request(name, { ifAvailable: true, mode: "exclusive" }, async lock => {
-    if (!lock) { reject(new StorageError("BUSY", "defuss-storage: file already has an owner")); return; }
-    resolve();
-    await held;
-  });
-  void request.catch(reject);
-  await acquired;
-  return async () => { unlock(); await request; };
 }
 
 /**

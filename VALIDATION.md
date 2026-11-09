@@ -1,5 +1,30 @@
 # Validation
 
+## 0.3.0 (unreleased), 2026-11-09
+
+Run on the same machine as 0.2.0 (macOS, Apple arm64). Only these checks ran
+for the directory adapter; the Node.js 24 and 20 and Bun test runs of 0.2.0
+were not repeated.
+
+| Check | Environment | Result |
+| --- | --- | --- |
+| `make lint` | TypeScript 5.9.3, oxlint 1.89.0 | Passed, 0 warnings |
+| Test suite (vitest 4.1.12) | Node.js 26.11.1 | 148 tests passed |
+| `make coverage` | vitest 4.1.12 V8 provider, `dist/*.mjs` without the browser-only modules | 99.15% lines |
+| Packed consumers | `bun pm pack` + `bun add`, Node.js 26.11.1 | ESM, CommonJS and declarations of all four entry points |
+| Browser suite | Chromium 151.0.7922.34 (Playwright 1.62.1) | 108 passed |
+| Browser suite | Firefox 153.0 (Playwright 1.62.1) | 108 passed |
+| Browser suite | WebKit 26.5 (Playwright 1.62.1) | 108 passed |
+
+The 108 browser tests per engine are the 72 of 0.2.0, the 33 contract cases
+and DSON integration on `createDirectoryStorage` over an OPFS directory handle,
+two-worker ownership through the directory adapter's Web Locks, and use on the
+main thread. The first WebKit run failed the write-buffer case: WebKit's
+writable stream writes the whole buffer behind a `Uint8Array` view, so the
+adapter now passes exact-length ArrayBuffers. The folder picker dialog needs a
+user gesture and is not automated; the site's end-to-end test stands in an OPFS
+folder for it.
+
 ## 0.2.0, 2026-11-07
 
 Every row below was executed on one machine: macOS (Darwin 25.6.0), Apple

@@ -120,6 +120,7 @@ import { createRequire } from 'node:module';
 import { appendChunks, createMemoryStorage } from 'defuss-storage';
 import { createFileStorage } from 'defuss-storage/node';
 import { createOPFSStorage } from 'defuss-storage/opfs';
+import { createDirectoryStorage } from 'defuss-storage/directory';
 const require=createRequire(import.meta.url);
 const common=require('defuss-storage');
 for (const [make, ingest] of [[createMemoryStorage, appendChunks], [common.createMemoryStorage, common.appendChunks]]) {
@@ -130,6 +131,7 @@ for (const [make, ingest] of [[createMemoryStorage, appendChunks], [common.creat
 }
 assert.equal(typeof createFileStorage,'function'); assert.equal(typeof require('defuss-storage/node').createFileStorage,'function');
 assert.equal(typeof createOPFSStorage,'function'); await assert.rejects(createOPFSStorage(),{code:'UNSUPPORTED'});
+assert.equal(typeof require('defuss-storage/directory').createDirectoryStorage,'function'); await assert.rejects(createDirectoryStorage({}),TypeError);
 `);
   execFileSync(process.execPath, ['smoke.mjs'], { cwd, stdio: 'pipe' });
   await writeWorkerConsumer(cwd);
@@ -137,6 +139,7 @@ assert.equal(typeof createOPFSStorage,'function'); await assert.rejects(createOP
   const declarations = `import { appendChunks, createMemoryStorage, type AdmissionOptions, type StorageAdapter, type CancellationSignal, type StorageErrorCode } from 'defuss-storage';
 import { createFileStorage } from 'defuss-storage/node';
 import { createOPFSStorage } from 'defuss-storage/opfs';
+import { createDirectoryStorage, type DirectoryHandle } from 'defuss-storage/directory';
 const limits: AdmissionOptions = { maxWriteBytes: 1024, maxPendingWriteBytes: 4096, maxPendingOperations: 8 };
 const store: StorageAdapter = createMemoryStorage(limits);
 const signal: CancellationSignal = { aborted: false };
@@ -149,6 +152,8 @@ async function use() {
 }
 void full;
 void use; void createFileStorage; void createOPFSStorage;
+async function folder(handle: DirectoryHandle) { const storage = await createDirectoryStorage(handle, { name: 'docs', maxPendingOperations: 8 }); return storage.capabilities.ownership; }
+void folder;
 `;
   await writeFile(path.join(cwd, 'consumer.mts'), declarations);
   await writeFile(path.join(cwd, 'consumer.cts'), declarations);

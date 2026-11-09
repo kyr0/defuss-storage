@@ -6,8 +6,6 @@ Agents append `<UTC ISO> s=<session> LESSON <VAE-DIALECT>` only for a falsified 
 Session start injects the 3 newest open entries: LESSON, FINDING learn=none, FAIL without a later DONE.
 Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC, then delete; OR delete BC evidence. -->
 
-2026-11-08T08:11:58Z s=3acf4600 FAIL prose,toolchain
-2026-11-08T08:22:20Z s=3acf4600 DONE fp=72a91e25f04a cov=98.9% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+28)
 2026-11-08T08:22:20Z s=3acf4600 FINDING src/errors.ts:StorageErrorCode learn=none: fixed structurally: the union is derived from CODE_LIST, so drift cannot be expressed; packed-consumer typecheck passes
 2026-11-08T08:22:20Z s=3acf4600 FINDING scripts/bench.mjs:sequentialSuite learn=none: lines now start with ISO time + INFO; one script, no mechanical rule needed
 2026-11-08T08:22:20Z s=3acf4600 FINDING ARCH.md:57 P07 learn=none: page corrected to the code's actual order
@@ -18,26 +16,16 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-08T08:22:20Z s=3acf4600 FINDING STORAGE_NEXT_PLAN.md:16,211 T02/T06 learn=none: rewritten without changing the plan's meaning; prose check passes
 2026-11-08T08:22:20Z s=3acf4600 FINDING examples/dson-frames.mjs:1, scripts/bench.mjs:sequentialRun|large learn=none: comment-only additions; example and release rerun green
 2026-11-08T08:22:20Z s=3acf4600 FINDING scripts/clean.mjs, package.json:scripts.build learn=none: replaced by `pkgroll --clean-dist`; dist/ SHA-256 of all 16 files identical before and after; script deleted
-2026-11-08T08:53:41Z s=3acf4600 FAIL env.example
-2026-11-08T08:55:35Z s=3acf4600 DONE fp=98c5cb249d38 cov=98.7% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+34)
-2026-11-08T08:55:35Z s=3acf4600 FINDING vitest.config.ts:server.deps.external learn=test: tests/dist-loading.test.ts fails if dist/ is no longer loaded natively
 2026-11-08T08:55:35Z s=3acf4600 FINDING vitest.config.ts:coverage learn=none: coverage runs transform dist/ and exclude the guard file; documented in vitest.config.ts and VALIDATION.md
 2026-11-08T08:55:35Z s=3acf4600 FINDING vitest.config.ts:coverageRun learn=none: prefix match; `vitest run --coverage.enabled=true` now reports 98.67%
 2026-11-08T08:55:35Z s=3acf4600 FINDING vitest.config.ts:env DEFUSS_DIST_TRANSFORMED learn=none: replaced by excluding tests/dist-loading.test.ts in coverage runs; no env var remains
 2026-11-08T08:55:35Z s=3acf4600 FINDING package.json:devDependencies.vitest learn=none: vitest 4.1.12 (engines ^20 || ^22 || >=24) pinned; Node 20.20.2 and 24.22.2 run 88/88; upgrade trigger: dropping Node 20
 2026-11-08T08:55:35Z s=3acf4600 FINDING src/file.ts:7 learn=none: points to tests/contract.ts
-2026-11-08T10:16:53Z s=3acf4600 DONE fp=e757a1054b24 cov=98.8% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+34)
-2026-11-08T10:16:53Z s=3acf4600 FINDING src/file.ts:currentSize learn=test: handle.test.ts 'queries the backend size once' (failed before: one query per call) and 'failed mutation or short read' re-query test
-2026-11-08T10:16:53Z s=3acf4600 FINDING src/file.ts:enqueue (overlap) learn=test: byte budget equal to maxReadBytes; native.test.ts 'stay within maxReadBytes together and start in call order' (failed before)
 2026-11-08T10:16:53Z s=3acf4600 FINDING src/file.ts:enqueue learn=none: folded into one then(onFulfilled, onRejected); per-operation probe: 0.83–0.91 µs vs 0.90–0.99 µs in 0.1.0
 2026-11-08T10:16:53Z s=3acf4600 FINDING src/file.ts:enqueue comment learn=none: comment states only the measured per-operation parity
 2026-11-08T10:16:53Z s=3acf4600 FINDING VALIDATION.md:benchmark P07/B01 learn=none: section rewritten with medians and ranges; the falsified hypothesis is recorded as such
 2026-11-08T10:16:53Z s=3acf4600 FINDING scripts/bench.mjs:offsets learn=none: array built with push; lint clean
-2026-11-08T11:06:48Z s=3acf4600 DONE fp=7fad0c8c5e34 cov=99.0% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+34)
 2026-11-08T11:06:48Z s=3acf4600 FINDING src/file.ts:stream (read-ahead) learn=none: read ahead only after the consumer spent >=5 µs on the previous chunk (READ_AHEAD_AFTER_MS); timing-dependent, so no deterministic test; bench row stream+checks
-2026-11-08T11:06:48Z s=3acf4600 FINDING tests/handle.test.ts:'cancellation removes an append from its batch' learn=test: signal now fires after the call and before the batch starts; coverage run shows the branch covered (file module 99.18% lines, only the allocation-failure path u
-2026-11-08T11:06:48Z s=3acf4600 FINDING ARCH.md:137 B01 learn=verifier: sentence moved to VALIDATION.md 'Not established for 0.2.0'; vae prose reports 0 findings on all four pages
-2026-11-08T11:06:48Z s=3acf4600 FINDING VALIDATION.md:Benchmark learn=memory: per-operation probe (7 x 100k appends) found no regression: 0.96 vs 1.24 µs median; load recorded in VALIDATION; .vae/MEMORY.md line: check uptime before benchm
 2026-11-08T11:26:51Z s=3acf4600 DONE fp=b7a3816c2014 cov=99.1% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+34)
 2026-11-08T11:26:51Z s=3acf4600 FINDING src/file.ts:append (write-buffer condition) learn=test: condition requires this.capacity && ...; the existing batching test passes again
 2026-11-08T11:26:51Z s=3acf4600 FINDING tests/handle.test.ts:write buffer learn=test: added 'a cancelled queued append keeps earlier buffered bytes at their offsets'; removing operations === 0 from the direct path makes it fail (mutation check); 
@@ -75,3 +63,46 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-09T09:08:09Z s=3acf4600 DONE fp=ce2ca308f2e3 cov=99.2% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+40)
 2026-11-09T09:08:09Z s=3acf4600 FINDING src/file.ts:fill|readExactly (internal async promise) learn=test: the mixed sync/async partial-read regression test checks offsets, windows and returned bytes through the new continuation; timings stay report-only
 2026-11-09T09:08:09Z s=3acf4600 FINDING CHANGELOG.md:transfer (stale performance claim) learn=none: the changelog now states the measured copy-cost saving and overlapping end-to-end ranges; no timing threshold was added
+2026-11-09T12:50:01Z s=3acf4600 FAIL prose,env.example
+2026-11-09T13:01:38Z s=3acf4600 DONE fp=4ae09702b910 cov=99.2% paths=.oxlintrc.json,Makefile,README.md,docs/404.html(+69)
+2026-11-09T13:01:38Z s=3acf4600 FINDING site/src/router.ts:screenFor learn=test: e2e 'every route renders its view, language and title' covers it
+2026-11-09T13:01:38Z s=3acf4600 FINDING site/e2e/site.test.mjs:demos learn=test: every demo step waits for [data-ready]
+2026-11-09T13:01:38Z s=3acf4600 FINDING site/src/charts.ts:described learn=test: charts e2e asserts the label; axe test covers role-img-alt
+2026-11-09T13:01:38Z s=3acf4600 FINDING site/src/demos/storage.worker.ts:limitsFor learn=none: UI clamp; the e2e covers the default budget only
+2026-11-09T13:01:38Z s=3acf4600 FINDING site/build/highlight.ts:SNIPPET_PLACEHOLDER learn=test: test/build.test.ts 'fillSnippets ... fails on unknown or missed ones'
+2026-11-09T13:01:38Z s=3acf4600 FINDING site/index.html:theme-color, site/src/install.ts:copyButton, site/src/messages.ts learn=none: cosmetic; no deterministic check worth adding
+2026-11-09T13:01:38Z s=3acf4600 FINDING site/ARCH.md:26 learn=verifier: the gate's prose step checks it
+2026-11-09T14:02:17Z s=3acf4600 FAIL tests.e2e.1
+2026-11-09T14:05:47Z s=3acf4600 DONE fp=a44462f783fc cov=99.2% paths=.oxlintrc.json,Makefile,README.md,docs/404.html(+69)
+2026-11-09T14:05:47Z s=3acf4600 FINDING site/vite.config.ts:base learn=test: e2e 'pages opened from disk' and unit test rootUrls
+2026-11-09T14:05:47Z s=3acf4600 FINDING site/build/i18n.ts:localize learn=test: test/build.test.ts repeated-key test
+2026-11-09T14:05:47Z s=3acf4600 FINDING site/src/router.ts:pinImageUrls learn=test: demo e2e fails on any console 404
+2026-11-09T14:44:39Z s=3acf4600 FAIL tests.e2e.1
+2026-11-09T15:10:09Z s=3acf4600 DONE fp=60138d82bd1a cov=99.2% paths=.oxlintrc.json,Makefile,README.md,docs/404.html(+72)
+2026-11-09T15:10:09Z s=3acf4600 FINDING site/index.html:#toast-container learn=test: the axe e2e test fails on it
+2026-11-09T15:10:09Z s=3acf4600 FINDING site/src/demos/status.ts:notify learn=test: demo e2e asserts the toast code spans
+2026-11-09T15:10:09Z s=3acf4600 FINDING site/e2e/site.test.mjs:install commands learn=test: the assertion now checks computed colours, so a markup change that drops highlighting still fails it
+2026-11-09T15:17:33Z s=3acf4600 DONE fp=2397b90737ba cov=99.2% paths=.oxlintrc.json,Makefile,README.md,docs/404.html(+72)
+2026-11-09T15:17:33Z s=3acf4600 FINDING site/index.html:inline file script; site/src/router.ts:go learn=test: the from-disk e2e test switches language and follows a header link in three engines
+2026-11-09T17:23:32Z s=3acf4600 FAIL tests.unit
+2026-11-09T17:24:13Z s=3acf4600 FAIL tests.unit
+2026-11-09T17:39:54Z s=3acf4600 DONE fp=518124022171 cov=99.2% paths=.oxlintrc.json,Makefile,README.md,docs/404.html(+74)
+2026-11-09T17:39:54Z s=3acf4600 FINDING site/src/demos/persist.ts:submit learn=test: demo e2e asserts Append is disabled for an empty line in three engines
+2026-11-09T17:39:54Z s=3acf4600 FINDING site/src/demos/seek.ts:jump learn=test: demo e2e asserts a seek adds no toast
+2026-11-09T17:39:54Z s=3acf4600 FINDING site/src/router.ts:afterCommit learn=test: the WebKit demo test reaches the benchmark by client navigation from deep in the page
+2026-11-09T17:39:54Z s=3acf4600 FINDING site/test/build.test.ts:renderVariant learn=test: the test checks localization, not copy
+2026-11-09T18:11:07Z s=3acf4600 FAIL tests.e2e.1
+2026-11-09T18:17:00Z s=3acf4600 DONE fp=bdf7966b8a4c cov=99.2% paths=.oxlintrc.json,ARCH.md,CHANGELOG.md,Makefile(+86)
+2026-11-09T18:17:00Z s=3acf4600 FINDING src/directory.ts:exact learn=test: the shared write-buffer contract case runs on the directory adapter in WebKit
+2026-11-09T18:17:00Z s=3acf4600 FINDING src/directory.ts:DirectoryHandle learn=test: site lint type-checks the worker passing a DOM handle
+2026-11-09T18:17:00Z s=3acf4600 FINDING site/index.html:toggle data-t learn=none: visual; markup pattern documented by the fix
+2026-11-09T19:22:02Z s=3acf4600 FAIL tests.unit,tests.e2e.1
+2026-11-09T19:27:30Z s=3acf4600 FAIL tests.e2e.1
+2026-11-09T19:33:50Z s=3acf4600 DONE fp=93efeb10aac6 cov=99.2% paths=.oxlintrc.json,ARCH.md,CHANGELOG.md,Makefile(+86)
+2026-11-09T20:37:10Z s=3acf4600 FAIL tests.e2e.1
+2026-11-09T20:42:30Z s=3acf4600 DONE fp=89325d87fdc2 cov=99.2% paths=.oxlintrc.json,ARCH.md,CHANGELOG.md,Makefile(+84)
+2026-11-09T20:42:30Z s=3acf4600 FINDING site/e2e/site.test.mjs:routing test learn=test: the test now filters the 404 status line as the route test already did; site e2e 23/23 pass
+2026-11-09T20:50:06Z s=3acf4600 FAIL prose
+2026-11-09T20:55:29Z s=3acf4600 FAIL tests.e2e.1
+2026-11-09T20:58:41Z s=3acf4600 DONE fp=9844a30af50c cov=99.2% paths=.oxlintrc.json,ARCH.md,CHANGELOG.md,Makefile(+84)
+2026-11-09T20:58:41Z s=3acf4600 FINDING site/e2e/site.test.mjs:597 demos in firefox learn=none: one load-related timeout; no deterministic defect to encode; .vae/MEMORY.md already says other sessions load the machine

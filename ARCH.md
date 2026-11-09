@@ -28,6 +28,12 @@ logical record sources. There is no runtime dependency between these layers.
   through a versioned global symbol in one JS realm. No multi-process lock claim.
 - `opfs.ts`: dedicated-worker sync-access handles; per-file origin Web Locks held
   through close. Removing files participates in the same ownership protocol.
+- `directory.ts`: any `FileSystemDirectoryHandle` (a picked folder in Chromium,
+  or OPFS), in windows and workers. Reads use `getFile()` snapshots; each
+  backend write is one committed `createWritable` stream, because an open
+  stream's bytes stay invisible to reads until it closes. Web Locks keyed by
+  the adapter name give the same ownership protocol as OPFS.
+- `locks.ts`: the non-waiting exclusive Web Lock both browser adapters use.
 - `custom.ts`: supported constructor for third-party byte backends.
 - `index.ts`: memory and common API only; no native imports or I/O at import
   time. The packed-consumer test walks this entry's module graph to enforce it.
@@ -207,7 +213,9 @@ require a record-layer immutable generation/commit design.
 There is no implicit transaction, rollback, durable rename, delete durability,
 snapshot, recovery scan or persistent key index. The native adapter does not
 enforce exclusion across processes/worker threads. OPFS's locks are origin
-scoped and cooperative with this package's namespace. Browser quota and eviction
+scoped and cooperative with this package's namespace; the directory adapter's
+locks are cooperative with its adapter name, and other programs can change a
+picked folder underneath it. Browser quota and eviction
 are outside the engine's control. The byte layer never silently repairs data.
 
 ## Integration evidence

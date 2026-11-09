@@ -1,0 +1,36 @@
+{
+  "name": "defuss-storage-site",
+  "version": "0.2.0",
+  "description": "Project website for defuss-storage: live OPFS demos, benchmarks and docs in English and German.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Aron Homberg",
+  "packageManager": "bun@1.4.3",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit && oxlint --deny-warnings src build test e2e vite.config.ts",
+    "test": "node --test test/",
+    "test:e2e": "node --test --test-concurrency=1 e2e/site.test.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "axe-core": "4.11.0",
+    "oxlint": "1.89.0",
+    "playwright": "1.62.1",
+    "typescript": "5.9.3",
+    "vite": "8.3.7"
+  },
+  "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@fontsource-variable/space-grotesk": "5.3.0",
+    "defuss-dom-router": "0.1.1",
+    "defuss-i18n": "0.2.0",
+    "defuss-shadcn": "0.9.12",
+    "echarts": "6.1.0",
+    "shiki": "4.6.0"
+  }
+}

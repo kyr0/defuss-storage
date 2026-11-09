@@ -29,6 +29,7 @@ const server = await serve(root, {
 /** Runs in the page: capability probe, contract suite, then the multi-worker lifecycle scenarios. */
 async function pageSuite() {
   const { createOPFSStorage } = await import('/dist/opfs.mjs');
+  const { createDirectoryStorage } = await import('/dist/directory.mjs');
   let sequence = 0;
   const spawn = () => new Worker('/tests/browser-worker.ts', { type: 'module' });
   const call = (worker, task, args = {}) => new Promise((resolve, reject) => {
@@ -46,8 +47,32 @@ async function pageSuite() {
     const a = fresh();
     const capabilities = await call(a, 'capabilities');
     const opfs = capabilities.getDirectory && capabilities.syncAccessHandle && capabilities.webLocks;
-    const result = await call(a, 'suite', { namespace, adapters: opfs ? ['memory', 'opfs'] : ['memory'] });
-    result.capabilities = capabilities; result.unsupported = opfs ? [] : ['OPFS adapter: required worker APIs missing'];
+    const directory = capabilities.getDirectory && capabilities.createWritable && capabilities.webLocks;
+    const result = await call(a, 'suite', { namespace, adapters: ['memory', ...(opfs ? ['opfs'] : []), ...(directory ? ['directory'] : [])] });
+    result.capabilities = capabilities;
+    result.unsupported = [...(opfs ? [] : ['OPFS adapter: required worker APIs missing']), ...(directory ? [] : ['directory adapter: createWritable or Web Locks missing'])];
+    if (directory) {
+      const scenarios = [
+        ['directory: two workers enforce ownership through Web Locks', async () => {
+          const b = fresh(); await call(a, 'hold', { namespace: `${namespace}-own`, kind: 'directory' });
+          await call(b, 'busy', { namespace: `${namespace}-own`, kind: 'directory' }); await call(a, 'release');
+        }],
+        ['directory: runs on the main thread, where OPFS sync handles do not exist', async () => {
+          const origin = await navigator.storage.getDirectory();
+          const folder = await (await origin.getDirectoryHandle('defuss-storage', { create: true })).getDirectoryHandle(`${namespace}-main`, { create: true });
+          const store = await createDirectoryStorage(folder);
+          const file = await store.open('main.bin', { create: true });
+          const receipt = await file.append(new Uint8Array([7, 8, 9]));
+          const bytes = [...await file.readExactly(0, 3)];
+          await file.close();
+          if (receipt.offset !== 0 || bytes.join() !== '7,8,9') throw new Error(`main thread: ${JSON.stringify({ receipt, bytes })}`);
+        }],
+      ];
+      for (const [name, run] of scenarios) {
+        try { await run(); result.passed.push(name); }
+        catch (error) { result.failed.push({ name, message: String(error?.stack ?? error) }); }
+      }
+    }
     if (opfs) {
       let rejected = false; try { await createOPFSStorage(); } catch (e) { rejected = e.code === 'UNSUPPORTED'; }
       (rejected ? result.passed : result.failed).push(rejected ? 'OPFS: rejects main-thread initialization' : { name: 'OPFS: rejects main-thread initialization', message: 'accepted' });

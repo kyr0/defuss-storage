@@ -32,7 +32,7 @@ CONFIG = {
     # Optional for edit runs (references/EDIT.md): "guidelines" (textsorte, zielgruppe, kommunikationsziel, hausstil,
     # geschuetzte_begriffe: terms a replacement must keep) and "edit" (max_part_chars, heading_depth, attempts, the
     # budgets, tool_scope, trace, max_tokens_total); unset keys keep pro-edit's defaults.
-    "prose": {"allow": {"AGENTS.md": "\u2192"}, "phrases": [], "html": []},  # AGENTS.md: the managed VAE block uses arrows
+    "prose": {"allow": {"AGENTS.md": "\u2192"}, "phrases": [], "html": ["docs/*.html"]},  # AGENTS.md: the managed VAE block uses arrows; docs/*.html: the built website, every route
 }
 
 # Deterministic invariants only; no semantic guesses.

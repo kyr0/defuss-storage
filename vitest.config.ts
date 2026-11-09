@@ -21,10 +21,11 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text'],
       // The built ESM modules the tests import. The CommonJS twins are the same
-      // source compiled twice. opfs.mjs needs a browser worker; the browser suite
-      // (`bun run test:browsers`) covers it behaviorally.
+      // source compiled twice. opfs.mjs, directory.mjs and their shared Web Locks
+      // chunk need a browser; the browser suite (`bun run test:browsers`) covers
+      // them behaviorally in Chromium, Firefox and WebKit.
       include: ['dist/*.mjs'],
-      exclude: ['dist/opfs.mjs'],
+      exclude: ['dist/opfs.mjs', 'dist/directory.mjs', 'dist/locks-*.mjs'],
     },
   },
 });

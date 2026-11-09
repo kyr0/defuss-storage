@@ -1,0 +1,174 @@
+# defuss-storage
+
+> File storage for JavaScript that writes and streams gigabytes per second and reads any offset in microseconds, with one API over the browser's Origin Private File System (OPFS, in a dedicated worker), native files on Node.js and Bun, and memory. Appends return their offset, reads are exact, streams read ahead of slow consumers, and every open file has admission limits and one owner. MIT licensed, no runtime dependencies, 10.6 kB gzipped for the OPFS entry.
+
+defuss-storage is the byte layer under a database engine, a virtual file system, a cache or an event log. It gives that layer durable files and leaves records, indexes, transactions and recovery to it. It is the backing store of defuss-db, defuss-graph and defuss-vfs, and works on its own.
+
+Choose it when you need:
+
+- durable files in a web app that survive reloads, with the same code on Node.js, Bun and in tests;
+- offsets you can index: `append()` resolves with `{ offset, byteLength }`;
+- bounded memory under load: a call beyond an open file's limits fails at once with `QUEUE_FULL` instead of queueing;
+- one writer per file across workers and tabs, through Web Locks, with `BUSY` for a second opener;
+- typed failures: every operational error is a `StorageError` with one of twelve codes.
+
+## Install
+
+```sh
+bun add defuss-storage
+# or: npm install defuss-storage, pnpm add defuss-storage, yarn add defuss-storage
+```
+
+Node.js 20.19 or newer, Bun, or a browser with OPFS; Chromium, Firefox and WebKit are tested. ESM, CommonJS and TypeScript declarations are included. Entry points: `defuss-storage` (memory adapter, `appendChunks`, `createStorageFile`, `StorageError`, types), `defuss-storage/opfs` (browser), `defuss-storage/directory` (a `FileSystemDirectoryHandle`, such as a folder picked with `showDirectoryPicker()` in Chromium) and `defuss-storage/node` (native files).
+
+## Browser: storage in a dedicated module worker
+
+OPFS synchronous access handles exist only in dedicated workers, on HTTPS or localhost. The worker owns the files; the page sends it messages. Vite, webpack and esbuild bundle the worker from the `new URL()` form.
+
+```js
+// storage.worker.js
+import { createOPFSStorage } from 'defuss-storage/opfs';
+
+const storage = await createOPFSStorage({ name: 'notes' });
+const file = await storage.open('notes.log', { create: true });
+
+self.onmessage = async ({ data }) => {
+  const bytes = new TextEncoder().encode(data + '\n');
+  const receipt = await file.append(bytes);
+  await file.flush();
+  self.postMessage(receipt); // { offset, byteLength }
+};
+```
+
+```js
+// main.js
+const worker = new Worker(
+  new URL('./storage.worker.js', import.meta.url),
+  { type: 'module' },
+);
+
+worker.onmessage = ({ data }) => console.log('stored at', data.offset);
+worker.postMessage('first note');
+```
+
+## Browser: a folder on disk
+
+`createDirectoryStorage(handle, { name? })` from `defuss-storage/directory` stores files in any `FileSystemDirectoryHandle`, in windows and workers. Each backend write commits through `createWritable`, so use `writeBuffer` for many small appends; prefer OPFS for large files with frequent small writes. Web Locks named after `name` (default: the folder's name) give one owner per file across workers and tabs.
+
+```js
+import { createDirectoryStorage } from 'defuss-storage/directory';
+
+const folder = await showDirectoryPicker({ mode: 'readwrite' }); // in a click handler
+const storage = await createDirectoryStorage(folder);
+```
+
+## Node.js and Bun: native files
+
+```js
+import { createReadStream } from 'node:fs';
+import { appendChunks } from 'defuss-storage';
+import { createFileStorage } from 'defuss-storage/node';
+
+const storage = await createFileStorage('./data');
+const file = await storage.open('copy.bin', { create: true });
+try {
+  const source = createReadStream('./input.bin', { highWaterMark: 64 * 1024 });
+  for await (const { offset, byteLength } of appendChunks(file, source, { inFlight: 16 })) {
+    // index records by offset here
+  }
+  await file.flush();
+} finally {
+  await file.close();
+}
+```
+
+`createFileStorage(root, { io: 'sync' })` turns every call into a blocking call on the calling thread. Use it in a worker thread or a CLI for small reads and scans; on a server's main thread it blocks every other task.
+
+## Tests: the memory adapter
+
+```js
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createMemoryStorage } from 'defuss-storage';
+import { appendRecord } from './log.js'; // your code, taking any storage
+
+test('appends a record', async () => {
+  const storage = createMemoryStorage();
+  const file = await storage.open('log', { create: true });
+  const { offset } = await appendRecord(file, { id: 1 });
+  assert.equal(offset, 0);
+  await file.close();
+});
+```
+
+Memory, native files and OPFS pass the same 33 contract cases, so code tested against memory runs unchanged on disk and in the browser.
+
+## API
+
+Adapters: `createMemoryStorage(options?)`, `createFileStorage(root, options?)`, `createOPFSStorage({ name, ...options })` and `createDirectoryStorage(handle, options?)`. Each has `open(name, options?)`, `list()` and `remove(name)`.
+
+`open` options: `create` (never truncates an existing file), `exclusive` (requires a new file), `readOnly`, `writeBuffer` (bytes to collect before one backend write).
+
+File handle:
+
+- `append(bytes, { transfer? })` resolves with `{ offset, byteLength }`; end-of-file selection and the write are one queued step.
+- `write(offset, bytes, { transfer? })` copies the input at call time, or takes its buffer with `transfer: true`; extending a file fills the gap with zeros.
+- `readExactly(offset, length)` returns the full range or rejects `UNEXPECTED_EOF`.
+- `read(offset, length)` returns up to `length` bytes; `readInto(offset, target)` fills your buffer and returns the count, without allocating.
+- `stream({ start, end, chunkSize, signal })` yields owned chunks, 64 KiB by default.
+- `size()`, `truncate(size)`, `flush()` (asks the backend to persist) and `close()` (drains queued work, releases ownership, idempotent).
+
+Helper: `appendChunks(file, source, { inFlight })` appends an async iterable chunk by chunk and yields the receipts in order, with up to `inFlight` appends at once.
+
+Custom backends: `createStorageFile(name, backend, options?)` wraps any byte backend with the same queue, limits and error handling.
+
+## Limits and backpressure
+
+Each open handle admits work at call time, before copying any input:
+
+- `maxPendingOperations`: queued plus running operations, default 1,024;
+- `maxPendingWriteBytes`: input copies held by queued writes, default 64 MiB;
+- `maxWriteBytes`: one write or append, default 64 MiB;
+- `maxReadBytes`: one read, `readInto` window or stream chunk, default 64 MiB.
+
+Pass them to the adapter factory. A call that does not fit rejects `QUEUE_FULL` and changes nothing. Await operations, bound concurrency or use `appendChunks` to stay inside the limits.
+
+## Errors
+
+`StorageError.code` is one of `NOT_FOUND`, `ALREADY_EXISTS`, `BUSY`, `CLOSED`, `READ_ONLY`, `PERMISSION_DENIED`, `QUOTA_EXCEEDED`, `UNEXPECTED_EOF`, `UNSUPPORTED`, `ABORTED`, `QUEUE_FULL` or `IO_ERROR`. Match the code, not the class: it survives module and realm boundaries. Invalid arguments throw `TypeError` or `RangeError`.
+
+```js
+try {
+  await storage.open('events.log');
+} catch (error) {
+  if (error.code === 'BUSY') showOpenElsewhere();
+  else if (error.code === 'NOT_FOUND') createFirst();
+  else throw error;
+}
+```
+
+## Measured performance
+
+From one `make bench` run on an Apple M5 Max, recorded November 9, 2026: medians of five runs, warm page cache. The reports are in the repository's `benchmarks/` folder.
+
+- OPFS appends in Chromium: 0.63 GiB/s with 4 KiB blocks, 3.89 GiB/s with 64 KiB, 6.02 GiB/s with 1 MiB; streamed reads with 1 MiB chunks: 11.53 GiB/s; a 4 KiB read at a random offset: 0.8 µs on average.
+- `writeBuffer: 1 MiB` made awaited 4 KiB appends 8.7 to 32 times faster in Chromium, Firefox and WebKit.
+- 2,000 appends of 64 KiB fired without await: version 0.2.0 admitted 1,024, refused 976 at once, and its ArrayBuffer memory peaked at 134 MB, where 0.1.0 buffered every call and reached 265 MB.
+- A 512 MiB file written in 1 MiB chunks and streamed back with SHA-256 in a Node.js process with a 32 MiB V8 heap: resident memory peaked at 77 MB.
+
+## Good to know
+
+- `flush()` is explicit and `close()` does not imply it. Transactions, snapshots and atomic replacement belong to the layer above.
+- A stream captures the end size on its first pull; later appends are not included.
+- Native file ownership is cooperative within one JavaScript realm: use one owner per root directory.
+- Browser contexts without OPFS, such as an ephemeral WebKit context, report `IO_ERROR` from `createOPFSStorage`; the memory adapter is a drop-in fallback.
+
+## Links
+
+- [README](https://github.com/kyr0/defuss-storage#readme): the full API and every invariant
+- [Architecture](https://github.com/kyr0/defuss-storage/blob/main/ARCH.md): design decisions and their measurements
+- [Changelog](https://github.com/kyr0/defuss-storage/blob/main/CHANGELOG.md)
+- [Validation report](https://github.com/kyr0/defuss-storage/blob/main/VALIDATION.md)
+- [Benchmark reports](https://github.com/kyr0/defuss-storage/tree/main/benchmarks)
+- [Live demos](https://storage.defuss.org/en/#demo): persistence, ownership, backpressure and a playground on real OPFS
+- [npm](https://www.npmjs.com/package/defuss-storage)

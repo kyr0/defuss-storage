@@ -1,9 +1,13 @@
 # defuss-storage
 
-Isomorphic byte storage (backing stroage) for `defuss-db`, `defuss-graph` and `defuss-vfs`.
-Memory, native files and browser OPFS share the same tested interface. No runtime
+Isomorphic byte storage (backing storage) for `defuss-db`, `defuss-graph` and `defuss-vfs`.
+Memory, native files, browser OPFS and directory handles (a folder on disk in
+Chromium) share the same tested interface. No runtime
 dependencies. Optional Node.js and browser entry points keep platform APIs out of
 the root import. ESM, CommonJS and TypeScript declarations are included.
+
+The website at <https://storage.defuss.org> runs the browser features live
+against your browser's real OPFS; its source is in [site/](site/README.md).
 
 This is the byte-I/O layer. It neither interprets `defuss-dson` nor implements a database.
 The DSON 1.3.0 integration example and tests exercise binary frame append, direct
@@ -140,6 +144,46 @@ VERIFIED (Playwright WebKit 26.5): in an ephemeral browser context, Playwright's
 default and comparable to private browsing, `getDirectory()` fails with
 `UnknownError`, which `createOPFSStorage` reports as `IO_ERROR`. A persistent
 profile works. Safari's own private mode was not tested.
+
+## Directory handles: a folder on disk
+
+`defuss-storage/directory` keeps its files in a `FileSystemDirectoryHandle`: a
+folder the user picks with `showDirectoryPicker()` (Chromium-based browsers), or
+an OPFS directory. It runs in windows and workers and needs Web Locks.
+
+```js
+import { createDirectoryStorage } from 'defuss-storage/directory';
+
+// showDirectoryPicker needs a user gesture, such as a click handler.
+const folder = await showDirectoryPicker({ mode: 'readwrite' });
+const storage = await createDirectoryStorage(folder);
+const file = await storage.open('notes.log', { create: true, writeBuffer: 1024 * 1024 });
+try {
+  await file.append(new TextEncoder().encode('hello\n'));
+} finally {
+  await file.close();
+}
+```
+
+Reads take a `getFile()` snapshot. Each backend write commits through
+`createWritable({ keepExistingData: true })` and resolves once the stream has
+closed, so `flush()` has nothing left to do. Why not one stream until
+`flush()`: the File System spec keeps a stream's bytes out of the file until it
+closes, which would break read-after-write. The spec also has the browser write
+to a swap copy of the file, so prefer `writeBuffer` for many small appends:
+append batching turns them into one commit. For large files with frequent small
+writes, OPFS sync handles write in place.
+
+Ownership uses Web Locks named after the adapter's `name`, by default the
+folder's name: adapters with the same name exclude each other's opens across
+workers and tabs. Give two different folders with the same name different
+names. Without read-write permission, writes reject `PERMISSION_DENIED`.
+
+VERIFIED (Chromium 151, Firefox 153, WebKit 26.5, Playwright 1.62.1): the 33
+contract cases and DSON integration pass on OPFS directory handles, two workers
+get `BUSY` for one file, and the adapter works on the main thread. WebKit's
+writable stream writes the whole buffer behind a `Uint8Array` view, so the
+adapter passes partial views as exact copies.
 
 ## API and invariants
 

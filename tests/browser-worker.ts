@@ -4,7 +4,8 @@
 // TypeScript's transpileModule; dist/ and DSON are served as built. Tasks:
 //   'capabilities'  which required APIs this browser exposes to a worker
 //   'suite'         the shared contract cases per adapter, failures collected per case
-//   'hold'          opens shared.bin, writes and flushes, and keeps it open
+//                   (memory, opfs, and directory: createDirectoryStorage over an OPFS directory)
+//   'hold'          opens shared.bin, writes and flushes, and keeps it open (OPFS, or the directory adapter)
 //   'busy'          a second worker must see BUSY for open and remove
 //   'release'       closes the held handle
 //   'reopen'        a fresh worker reads the flushed bytes; with `retry` it waits
@@ -12,6 +13,7 @@
 //   'foreign-dir'   a directory under a valid name is never opened, removed or listed
 import { createMemoryStorage, type AdapterOptions, type StorageAdapter, type StorageFile } from '../dist/index.mjs';
 import { createOPFSStorage } from '../dist/opfs.mjs';
+import { createDirectoryStorage, type DirectoryHandle } from '../dist/directory.mjs';
 import * as dson from '../node_modules/defuss-dson/dist/sequence.mjs';
 import { contractCases, runCase, dsonContract, assert, equal, type ContractCase } from './contract.ts';
 
@@ -23,17 +25,25 @@ interface Directory {
 }
 interface WorkerScope {
   navigator: { storage?: { getDirectory?: () => Promise<Directory> }; locks?: { request?: unknown } };
-  FileSystemFileHandle?: { prototype?: { createSyncAccessHandle?: unknown } };
+  FileSystemFileHandle?: { prototype?: { createSyncAccessHandle?: unknown; createWritable?: unknown } };
   onmessage: ((event: { data: Request }) => void) | null;
   postMessage(message: unknown): void;
 }
-interface Request { id: number; task: string; namespace: string; adapters: string[]; retry?: boolean }
+interface Request { id: number; task: string; namespace: string; adapters: string[]; retry?: boolean; kind?: 'opfs' | 'directory' }
 type Thrown = { name?: string; code?: string; message?: string; stack?: string; cause?: { name?: string; message?: string } };
 const scope = globalThis as unknown as WorkerScope;
 
 const SHARED = [4, 8, 15, 16, 23, 42];
 let held: StorageFile | undefined;
 async function erase(store: StorageAdapter): Promise<void> { for (const name of await store.list()) await store.remove(name); }
+/** An OPFS directory below defuss-storage/ for the directory adapter: the same handle type a picked folder has. */
+async function testDirectory(name: string): Promise<DirectoryHandle> {
+  const origin = await scope.navigator.storage!.getDirectory!();
+  return await (await origin.getDirectoryHandle('defuss-storage', { create: true })).getDirectoryHandle(name, { create: true }) as unknown as DirectoryHandle;
+}
+/** The adapter a lifecycle task runs on. */
+const storeFor = async (namespace: string, kind: Request['kind'] = 'opfs'): Promise<StorageAdapter> =>
+  kind === 'directory' ? createDirectoryStorage(await testDirectory(namespace)) : createOPFSStorage({ name: namespace });
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // WebKit stacks omit the message, so failures carry name, code, message and cause explicitly.
 const describe = (caught: unknown): string => { const error = caught as Thrown | undefined; return `${error?.name ?? 'Error'}${error?.code ? ` ${error.code}` : ''}: ${error?.message ?? error}` +
@@ -43,7 +53,9 @@ const describe = (caught: unknown): string => { const error = caught as Thrown |
 async function suite(adapter: string, namespace: string) {
   const passed: string[] = []; const failed: { name: string; message: string }[] = [];
   const make = async (suffix: number | string, options: AdapterOptions = {}): Promise<StorageAdapter> =>
-    adapter === 'memory' ? createMemoryStorage(options) : createOPFSStorage({ ...options, name: `${namespace}-${suffix}` });
+    adapter === 'memory' ? createMemoryStorage(options)
+      : adapter === 'directory' ? createDirectoryStorage(await testDirectory(`${namespace}-dir-${suffix}`), options)
+      : createOPFSStorage({ ...options, name: `${namespace}-${suffix}` });
   const cases: [string, (store: StorageAdapter) => Promise<unknown>, number | string][] = [
     ...contractCases.map(([name, body]: ContractCase, i): [string, (store: StorageAdapter) => Promise<unknown>, number] =>
       [name, store => runCase(store, body, options => make(i, options)), i]),
@@ -61,6 +73,7 @@ const tasks: Record<string, (request: Request) => Promise<unknown>> = {
   capabilities: async () => ({
     getDirectory: typeof scope.navigator.storage?.getDirectory === 'function',
     syncAccessHandle: typeof scope.FileSystemFileHandle?.prototype?.createSyncAccessHandle === 'function',
+    createWritable: typeof scope.FileSystemFileHandle?.prototype?.createWritable === 'function',
     webLocks: typeof scope.navigator.locks?.request === 'function',
   }),
   suite: async ({ namespace, adapters }) => {
@@ -68,13 +81,13 @@ const tasks: Record<string, (request: Request) => Promise<unknown>> = {
     for (const adapter of adapters) { const r = await suite(adapter, namespace); passed.push(...r.passed); failed.push(...r.failed); }
     return { passed, failed };
   },
-  hold: async ({ namespace }) => {
-    const store = await createOPFSStorage({ name: namespace }); held = await store.open('shared.bin', { create: true });
+  hold: async ({ namespace, kind }) => {
+    const store = await storeFor(namespace, kind); held = await store.open('shared.bin', { create: true });
     await held.truncate(0); await held.append(new Uint8Array(SHARED)); await held.flush(); return 'held';
   },
   release: async () => { await held?.close(); held = undefined; return 'released'; },
-  busy: async ({ namespace }) => {
-    const store = await createOPFSStorage({ name: namespace });
+  busy: async ({ namespace, kind }) => {
+    const store = await storeFor(namespace, kind);
     for (const fn of [() => store.open('shared.bin'), () => store.remove('shared.bin')]) {
       let code: unknown; try { await fn(); } catch (e) { code = (e as Thrown).code; } equal(code, 'BUSY', 'cross-worker ownership');
     }

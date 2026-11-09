@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 (unreleased)
+
+- Add the `defuss-storage/directory` entry point: `createDirectoryStorage(handle, options?)`
+  stores files in any `FileSystemDirectoryHandle`, such as a folder the user
+  picked with `showDirectoryPicker()` in Chromium-based browsers, or an OPFS
+  directory. It runs in windows and workers, commits each backend write through
+  `createWritable`, and takes Web Locks named after the adapter's `name`
+  (default: the folder's name) for ownership across workers and tabs.
+- The 33 contract cases and DSON integration now also run on directory handles
+  in Chromium, Firefox and WebKit.
+
 ## 0.2.0 (2026-11-07)
 
 **Compatibility:** writes are now admitted per handle. Code that issues many

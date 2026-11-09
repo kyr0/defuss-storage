@@ -1,0 +1,22 @@
+{
+  // One config for the browser code (src), the build plugin (build) and the e2e suite.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "paths": {
+      "defuss-storage": ["../dist/index.d.mts"],
+      "defuss-storage/opfs": ["../dist/opfs.d.mts"],
+      "defuss-storage/directory": ["../dist/directory.d.mts"]
+    }
+  },
+  "include": ["src", "build", "test", "vite.config.ts"]
+}

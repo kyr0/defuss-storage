@@ -1,7 +1,7 @@
 {
   "name": "defuss-storage",
-  "version": "0.2.0",
-  "description": "Isomorphic byte storage with memory, Node.js file and browser OPFS adapters.",
+  "version": "0.3.0",
+  "description": "Isomorphic byte storage with memory, Node.js file, browser OPFS and directory-handle adapters.",
   "type": "module",
   "license": "MIT",
   "author": "Aron Homberg",
@@ -38,6 +38,16 @@
       "require": {
         "types": "./dist/opfs.d.cts",
         "default": "./dist/opfs.cjs"
+      }
+    },
+    "./directory": {
+      "import": {
+        "types": "./dist/directory.d.mts",
+        "default": "./dist/directory.mjs"
+      },
+      "require": {
+        "types": "./dist/directory.d.cts",
+        "default": "./dist/directory.cjs"
       }
     }
   },
