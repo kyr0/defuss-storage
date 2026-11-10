@@ -26,13 +26,8 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-08T10:16:53Z s=3acf4600 FINDING VALIDATION.md:benchmark P07/B01 learn=none: section rewritten with medians and ranges; the falsified hypothesis is recorded as such
 2026-11-08T10:16:53Z s=3acf4600 FINDING scripts/bench.mjs:offsets learn=none: array built with push; lint clean
 2026-11-08T11:06:48Z s=3acf4600 FINDING src/file.ts:stream (read-ahead) learn=none: read ahead only after the consumer spent >=5 µs on the previous chunk (READ_AHEAD_AFTER_MS); timing-dependent, so no deterministic test; bench row stream+checks
-2026-11-08T11:26:51Z s=3acf4600 DONE fp=b7a3816c2014 cov=99.1% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+34)
-2026-11-08T11:26:51Z s=3acf4600 FINDING src/file.ts:append (write-buffer condition) learn=test: condition requires this.capacity && ...; the existing batching test passes again
-2026-11-08T11:26:51Z s=3acf4600 FINDING tests/handle.test.ts:write buffer learn=test: added 'a cancelled queued append keeps earlier buffered bytes at their offsets'; removing operations === 0 from the direct path makes it fail (mutation check); 
 2026-11-08T11:26:51Z s=3acf4600 FINDING VALIDATION.md:Not established learn=none: line now says main thread on Node.js and Bun only, not in a worker thread
-2026-11-08T11:26:51Z s=3acf4600 FINDING VALIDATION.md:benchmark (library overhead) learn=memory: VALIDATION records the interleaved figures; .vae/MEMORY.md line: compare timings only interleaved within one run
 2026-11-08T11:26:51Z s=3acf4600 FINDING README.md:Performance (transfer) learn=none: README and VALIDATION state the gain is not established and cite only the probed copy cost (24 µs per MiB)
-2026-11-08T17:01:05Z s=3acf4600 DONE fp=ab64a1026acf cov=99.1% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+34)
 2026-11-08T17:01:05Z s=3acf4600 FINDING README.md:298 P (precision) learn=none: one-off wording; the load note now states the measured load
 2026-11-08T17:01:05Z s=3acf4600 FINDING CHANGELOG.md:28 P (precision) learn=none: one-off wording; baseline named
 2026-11-08T17:01:05Z s=3acf4600 FINDING VALIDATION.md:52 B (evidence) learn=none: replaced by the measured spread
@@ -106,3 +101,8 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-09T20:55:29Z s=3acf4600 FAIL tests.e2e.1
 2026-11-09T20:58:41Z s=3acf4600 DONE fp=9844a30af50c cov=99.2% paths=.oxlintrc.json,ARCH.md,CHANGELOG.md,Makefile(+84)
 2026-11-09T20:58:41Z s=3acf4600 FINDING site/e2e/site.test.mjs:597 demos in firefox learn=none: one load-related timeout; no deterministic defect to encode; .vae/MEMORY.md already says other sessions load the machine
+2026-11-10T02:04:22Z s=3acf4600 FAIL tests.e2e.1
+2026-11-10T02:36:49Z s=3acf4600 DONE fp=201e77786816 cov=99.2% paths=docs/404.html,docs/assets/backend-But3-ao0.js,docs/assets/backend-ChSdQFFH.js,docs/assets/index-B6HYNZ1Y.css(+23)
+2026-11-10T02:36:49Z s=3acf4600 FINDING site/src/styles.css:html font-size 125% learn=memory: .vae/MEMORY.md: breakpoints that must follow html font-size are container queries
+2026-11-10T02:36:49Z s=3acf4600 FINDING site/index.html:hero snippet, explorer table learn=test: the e2e axe check covers it
+2026-11-10T02:36:49Z s=3acf4600 FINDING site/src/styles.css:seek and playground demos learn=test: the e2e fit and persistence checks cover it

@@ -1,6 +1,13 @@
 /* defuss-storage site: brand tokens over the defuss-shadcn theme, then the page
    layout. Components keep their own styles; this file composes them. */
 
+/* The type scale: every size on the page is in rem, so this one value sets
+   them all, as a share of the browser's default (which keeps a visitor's own
+   font setting). The chart reads its size as pixels; registering the property
+   makes the rem it is given compute to pixels. */
+html { font-size: 125%; }
+@property --chart-font-size { syntax: '<length>'; inherits: true; initial-value: 13px; }
+
 :root {
   --font-display: 'Space Grotesk Variable', var(--font-sans);
   --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -88,12 +95,18 @@
   .st-header.mk-header[data-variant="floating"] { padding: 1.25rem 1rem .75rem; }
   .st-header .mk-header-actions { gap: .375rem; }
   .st-lang { width: auto; }
-  .chart { --chart-font-size: 14px; }
+  .chart { --chart-font-size: .875rem; }
+  /* The menu button replaces the wide controls where the nav and they do not fit in one row. Why a
+     container query on the component's mk-header container instead of a media query: its rem follows
+     the root size, as the component's own nav switch does, so the switch moves with the type scale.
+     VERIFIED: (site probe, Chromium, 125%) the nav wrapped at a 53rem header and fit at 55.5rem. */
   .st-menu { display: none; }
-  @media (max-width: 52rem) {
-    .st-wide { display: none; }
+  @container mk-header (max-width: 56rem) {
+    .st-wide, .st-header .mk-header-nav { display: none; }
     .st-menu { display: inline-flex; }
   }
+  /* phones: the logo alone links home (its label names the site), so the controls keep their row */
+  @container mk-header (max-width: 20rem) { .st-header .mk-header-name { display: none; } }
 
   /* hero */
   .st-hero-scene { padding-block: clamp(4.5rem, 10vw, 7.5rem) 1rem; }
@@ -108,8 +121,8 @@
   .mk-hero-title em { font-style: normal; background: linear-gradient(100deg, var(--st-accent) 10%, var(--st-accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .st-flip { margin: .25rem 0 0; font-family: var(--font-display); font-size: clamp(1.25rem, 3vw, 1.75rem); font-weight: 600; letter-spacing: -.02em; line-height: 1.3; }
   /* The use cases rotate in one cell; they wrap, since the longest ones are wider than a phone. The cell takes the tallest line's height. */
-  .st-flip .text-rotate { height: auto; max-width: 100%; }
-  .st-flip .text-rotate > span > * { height: auto; white-space: normal; }
+  .st-flip .text-rotate, .st-run .card-title .text-rotate { height: auto; max-width: 100%; }
+  .st-flip .text-rotate > span > *, .st-run .card-title .text-rotate > span > * { height: auto; white-space: normal; }
   .st-hero-content .st-hero-media { align-self: center; aspect-ratio: auto; overflow: visible; background: none; border-radius: 0; }
   .st-hero-window { position: relative; }
   .st-hero-window .mockup-code { margin: 0; box-shadow: var(--shadow-2xl), 0 40px 90px -40px color-mix(in oklch, var(--st-accent) 60%, transparent); }
@@ -163,23 +176,24 @@
     text-shadow: 0 0 40px oklch(0.17 0.025 215 / .6); }
 
   /* demo window and tabs */
-  .st-window { display: flex; flex-direction: column; gap: 1.25rem; margin-block-start: 2.5rem; padding: clamp(1rem, 2.5vw, 2rem);
+  .st-window { display: flex; flex-direction: column; gap: .75rem; margin-block-start: 2.5rem; padding: clamp(1rem, 2vw, 1.25rem);
     background: var(--card); border-radius: var(--radius-xl); border: 1px solid var(--border);
     box-shadow: var(--shadow-2xl), 0 30px 80px -36px color-mix(in oklch, var(--st-accent) 55%, transparent); }
   /* five demos: equal columns across the window, no tab scrolled out of view */
-  .tabs.st-tabs > .tab-list { display: grid; grid-auto-flow: row; grid-template-columns: repeat(5, minmax(0, 1fr)); width: 100%; margin: 0 0 1.25rem; overflow: visible; }
+  .tabs.st-tabs > .tab-list { display: grid; grid-auto-flow: row; grid-template-columns: repeat(5, minmax(0, 1fr)); width: 100%; margin: 0 0 .75rem; overflow: visible; }
   .st-tab { display: flex; align-items: center; gap: .65rem; height: auto; padding-block: .55rem; text-align: start; white-space: normal; }
   .st-tab-icon { width: 1.5rem; height: 1.5rem; }
   .st-tab-title { display: block; font-weight: 600; line-height: 1.25; }
   .st-tab-desc { display: block; font-size: .875rem; font-weight: 400; line-height: 1.3; color: var(--muted-foreground); }
-  @media (max-width: 64rem) { .tabs.st-tabs .st-tab-desc, .tabs.st-tabs .st-tab > .st-tab-icon { display: none; } .st-tab { justify-content: center; } }
-  @media (max-width: 52rem) { .tabs.st-tabs > .tab-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-  @media (max-width: 40rem) {
-    .tabs.st-tabs .st-tab-desc, .tabs.st-tabs .st-tab > .st-tab-icon { display: none; }
-    /* the component flows tabs into columns; two rows of two fit a phone */
-    .tabs.st-tabs > .tab-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .st-tab { justify-content: center; }
-  }
+  /* Descriptions, then columns, only where the list has room for them. Why container queries
+     instead of media queries: their rem follows the root size, so each threshold grows with the
+     labels. VERIFIED: (site probe, Chromium, EN and DE) labels with descriptions clip below a 62rem
+     list, and a title alone in five columns ("Backpressure") below 50rem. */
+  .tabs.st-tabs { container: st-tabs / inline-size; }
+  @container st-tabs (max-width: 63rem) { .tabs.st-tabs .st-tab-desc, .tabs.st-tabs .st-tab > .st-tab-icon { display: none; } .st-tab { justify-content: center; } }
+  @container st-tabs (max-width: 50rem) { .tabs.st-tabs > .tab-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  /* the component flows tabs into columns; two rows of two fit a phone */
+  @container st-tabs (max-width: 35rem) { .tabs.st-tabs > .tab-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   /* Every demo is two columns that fit one screen: text and controls on the
      left, what happens on the right. Logs, the hex view and the console scroll
      inside their box, so a long run never pushes the window past the viewport.
@@ -187,7 +201,9 @@
   .st-demo-grid { display: grid; gap: clamp(1.25rem, 3vw, 2.5rem); grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: stretch; }
   /* the hex view needs about 37rem for its ASCII column, the readable proof that the bytes came back */
   .st-demo-grid[data-demo="persist"] { grid-template-columns: minmax(0, .85fr) minmax(0, 1.3fr); }
-  @media (max-width: 56rem) { .st-demo-grid, .st-demo-grid[data-demo="persist"] { grid-template-columns: minmax(0, 1fr); } }
+  /* the seek list scrolls sideways anyway; its text, stats and code get the room */
+  .st-demo-grid[data-demo="seek"] { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+  @media (max-width: 56rem) { .st-demo-grid, .st-demo-grid[data-demo="persist"], .st-demo-grid[data-demo="seek"] { grid-template-columns: minmax(0, 1fr); } }
   .st-demo-side { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
   .st-demo-title { display: flex; align-items: baseline; margin: 0; font-family: var(--font-display); font-size: 1.375rem; letter-spacing: -.015em; }
   .st-demo-text, .st-demo-note { margin: 0; color: var(--muted-foreground); font-size: 1rem; }
@@ -211,7 +227,8 @@
   @media (prefers-reduced-motion: no-preference) { .st-fresh { animation: st-matrix 1.4s ease-out; } }
   .st-hex-foot { margin: 0; padding: .6rem 1rem; font-size: .875rem; color: var(--muted-foreground); border-block-start: 1px solid var(--border); }
   /* the ASCII column only where the whole row fits */
-  @container (max-width: 37rem) { .st-hex-row { grid-template-columns: 8ch auto; } .st-hex-ascii { display: none; } }
+  /* too narrow for three columns: the text goes under its bytes, so what was written stays readable */
+  @container (max-width: 37rem) { .st-hex-row { grid-template-columns: 8ch auto; } .st-hex-ascii { grid-column: 2; } }
 
   /* The backend bar over each demo's view, and the note that stands in for a
      backend a web page cannot run (native files) or a demo has nothing to show on. */
@@ -237,10 +254,11 @@
 
   /* seek */
   .st-seek-records { width: auto; }
-  .st-seek-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin: 0; }
-  .st-seek-stat { display: flex; flex-direction: column-reverse; gap: .1rem; padding: .625rem .875rem; border: 1px solid var(--st-edge); border-radius: var(--radius-lg); }
-  .st-seek-stat dt { font-size: .875rem; color: var(--muted-foreground); }
-  .st-seek-stat dd { margin: 0; font: 700 1.125rem/1.25 var(--font-display); font-variant-numeric: tabular-nums; }
+  /* one row of four where it fits, two on a phone */
+  .st-seek-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: .5rem; margin: 0; }
+  .st-seek-stat { display: flex; flex-direction: column-reverse; gap: .1rem; padding: .375rem .625rem; border: 1px solid var(--st-edge); border-radius: var(--radius-lg); }
+  .st-seek-stat dt { font-size: .875rem; line-height: 1.25; color: var(--muted-foreground); }
+  .st-seek-stat dd { margin: 0; font: 700 1rem/1.25 var(--font-display); font-variant-numeric: tabular-nums; }
   .st-seek-view { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 24rem; max-height: 36rem; overflow: hidden; border-radius: var(--radius-lg); }
   .st-seek-jump { display: flex; align-items: center; gap: .5rem; padding: .5rem .625rem .5rem .875rem; background: oklch(1 0 0 / .04); border-bottom: 1px solid var(--st-matrix-line); }
   .st-seek-jump > .st-icon { flex: none; color: var(--st-matrix-dim); }
@@ -307,10 +325,10 @@
   .st-playground-head { display: flex; flex-direction: column; gap: .5rem; max-width: 52rem; }
   .st-play-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
   @media (max-width: 56rem) { .st-play-grid { grid-template-columns: minmax(0, 1fr); } }
-  .st-playground-bar .select { width: auto; max-width: 100%; }
+  .st-playground-bar .select { flex: 1 1 12rem; width: auto; min-width: 0; max-width: 100%; }
   .st-editor { flex: 1; display: flex; flex-direction: column; --code-example-pad: 1rem; --code-example-font-size: .875rem; --code-example-line-height: 1.6; border-radius: var(--radius-lg); overflow: hidden; background: var(--card); color: var(--foreground); border: 1px solid var(--st-edge); }
   .st-editor .code-example-panel { position: relative; display: block; flex: 1; border: 0; }
-  .st-editor .code-example-src { min-block-size: 22rem; max-block-size: 28rem; }
+  .st-editor .code-example-src { min-block-size: 15rem; max-block-size: 19rem; }
   .st-editor .code-example-copy { font-size: .875rem; position: absolute; inset-block-start: .5rem; inset-inline-end: .5rem; z-index: 2; }
   .st-console { flex: 1; align-content: start; min-height: 12rem; max-height: 28rem; overflow-y: auto; margin: 0; }
 
@@ -468,6 +486,12 @@
   .st-ad-role { font-weight: 500; }
   .st-ad .btn { align-self: flex-start; }
   @media (min-width: 64rem) { .st-footer-nav.mk-footer-nav { grid-template-columns: 1fr 1fr 1fr 1.8fr; } }
+  /* phones: long button labels wrap and the footer stacks, instead of leaving the screen */
+  @media (max-width: 30rem) {
+    .mk-section-header-actions { min-width: 0; max-width: 100%; }
+    .mk-cta-actions .btn, .mk-section-header-actions .btn, .corner-leaf .btn { max-width: 100%; height: auto; min-height: 2.75rem; padding-block: .5rem; white-space: normal; line-height: 1.25; text-align: start; }
+    .st-footer-nav.mk-footer-nav { grid-template-columns: minmax(0, 1fr); }
+  }
 
   /* code: token colours follow the page theme; the hero window stays a dark
      terminal, the page's one deliberate dark surface besides the bands */

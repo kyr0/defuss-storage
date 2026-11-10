@@ -77,6 +77,14 @@ unused key.
   and every header and footer link then lands on a section of one document.
   VERIFIED: (e2e) the header, sheet and not-found links reach
   `#performance`, and the live run starts from `#run`.
+- The type scale is one rule, `html { font-size: 125% }`: every size in
+  `src/styles.css` is in rem. Breakpoints that must move with it, the header's
+  menu switch and the demo tabs' columns, are container queries. Why not media
+  queries: a media query measures rem against the browser default of 16px, a
+  container query against the root, so only the latter grows with the type.
+  VERIFIED: (site probe, Chromium) with media queries the header nav wrapped
+  at 900 to 1100px wide and tab labels clipped at 1024 to 1512px; with
+  container queries nothing overflows from 320 to 1920px in either language.
 - `src/theme.ts` and an inline script in `<head>` apply the saved theme or the
   system preference before first paint.
 - ECharts (core, bar, line and custom series, SVG renderer), Shiki for the
