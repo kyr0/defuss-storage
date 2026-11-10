@@ -39,33 +39,18 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-08T17:52:31Z s=3acf4600 FINDING scripts/package-test.mjs:worker.mjs learn=none: worker.mjs removes its directory; leftovers deleted
 2026-11-08T17:52:31Z s=3acf4600 FINDING scripts/bench.mjs:large (Bun) learn=none: comment and VALIDATION cite the discriminating probe
 2026-11-08T17:52:31Z s=3acf4600 FINDING VALIDATION.md:Browsers (OPFS) B (evidence) learn=none: cause not established; recorded under Not established, README and CHANGELOG; no test for an unknown cause
-2026-11-08T17:52:31Z s=3acf4600 FINDING VALIDATION.md:Not established P (precision) learn=test: scripts/package-test.mjs worker consumer; mutation checks (wrong offset, impossible tick count) fail it
-2026-11-08T19:12:59Z s=3acf4600 DONE fp=8dfd0b078a30 cov=99.1% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+40)
-2026-11-08T19:12:59Z s=3acf4600 FINDING src/file.ts:stream (read-ahead timing) learn=test: timed every 8th chunk (READ_AHEAD_SAMPLE_EVERY); read-ahead tests fail when the first chunk is not timed (mutation run)
 2026-11-08T19:12:59Z s=3acf4600 FINDING src/file.ts:readInto|readExactly (async task) learn=none: tasks chain fill() from plain functions; timing is not a test subject (report-only)
 2026-11-08T19:12:59Z s=3acf4600 FINDING src/file.ts:read (currentSize) learn=none: uses knownSize ?? await currentSize(), as size() does
 2026-11-08T19:12:59Z s=3acf4600 FINDING src/file.ts:admit/release (closures) learn=none: admission tests still check counters return to zero
-2026-11-08T19:12:59Z s=3acf4600 FINDING tests/contract.ts:write buffer case learn=test: case now reads buffered appends through readInto and readExactly; both mutations fail 3 tests
 2026-11-08T19:12:59Z s=3acf4600 FINDING VALIDATION.md:Browsers (OPFS) L (logic) learn=none: claim removed; section records the removal probe and that per-call cost does not explain it
 2026-11-08T19:12:59Z s=3acf4600 FINDING VALIDATION.md:Read path after profiling B (evidence) learn=none: figures replaced by the measured ones in VALIDATION and src comments
 2026-11-08T19:12:59Z s=3acf4600 FINDING benchmarks/*.json learn=none: kept quieter pre-fix reports, labelled as pre-fix; re-run listed under Not established
-2026-11-08T20:59:13Z s=3acf4600 DONE fp=ad51a06f5b7e cov=99.1% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+40)
 2026-11-08T20:59:13Z s=3acf4600 FINDING benchmarks/*.json learn=none: docs quote the published third run and state cross-run spreads
 2026-11-08T20:59:13Z s=3acf4600 FINDING VALIDATION.md:Benchmark B (evidence) learn=none: bullet and Not established item updated
 2026-11-08T20:59:13Z s=3acf4600 FINDING VALIDATION.md:Bun memory stream learn=none: recorded as within Bun's run-to-run spread
-2026-11-09T09:08:09Z s=3acf4600 DONE fp=ce2ca308f2e3 cov=99.2% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+40)
-2026-11-09T09:08:09Z s=3acf4600 FINDING src/file.ts:fill|readExactly (internal async promise) learn=test: the mixed sync/async partial-read regression test checks offsets, windows and returned bytes through the new continuation; timings stay report-only
 2026-11-09T09:08:09Z s=3acf4600 FINDING CHANGELOG.md:transfer (stale performance claim) learn=none: the changelog now states the measured copy-cost saving and overlapping end-to-end ranges; no timing threshold was added
-2026-11-09T12:50:01Z s=3acf4600 FAIL prose,env.example
-2026-11-09T13:01:38Z s=3acf4600 DONE fp=4ae09702b910 cov=99.2% paths=.oxlintrc.json,Makefile,README.md,docs/404.html(+69)
-2026-11-09T13:01:38Z s=3acf4600 FINDING site/src/router.ts:screenFor learn=test: e2e 'every route renders its view, language and title' covers it
-2026-11-09T13:01:38Z s=3acf4600 FINDING site/e2e/site.test.mjs:demos learn=test: every demo step waits for [data-ready]
-2026-11-09T13:01:38Z s=3acf4600 FINDING site/src/charts.ts:described learn=test: charts e2e asserts the label; axe test covers role-img-alt
 2026-11-09T13:01:38Z s=3acf4600 FINDING site/src/demos/storage.worker.ts:limitsFor learn=none: UI clamp; the e2e covers the default budget only
-2026-11-09T13:01:38Z s=3acf4600 FINDING site/build/highlight.ts:SNIPPET_PLACEHOLDER learn=test: test/build.test.ts 'fillSnippets ... fails on unknown or missed ones'
 2026-11-09T13:01:38Z s=3acf4600 FINDING site/index.html:theme-color, site/src/install.ts:copyButton, site/src/messages.ts learn=none: cosmetic; no deterministic check worth adding
-2026-11-09T13:01:38Z s=3acf4600 FINDING site/ARCH.md:26 learn=verifier: the gate's prose step checks it
-2026-11-09T14:02:17Z s=3acf4600 FAIL tests.e2e.1
 2026-11-09T14:05:47Z s=3acf4600 DONE fp=a44462f783fc cov=99.2% paths=.oxlintrc.json,Makefile,README.md,docs/404.html(+69)
 2026-11-09T14:05:47Z s=3acf4600 FINDING site/vite.config.ts:base learn=test: e2e 'pages opened from disk' and unit test rootUrls
 2026-11-09T14:05:47Z s=3acf4600 FINDING site/build/i18n.ts:localize learn=test: test/build.test.ts repeated-key test
@@ -106,3 +91,18 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-10T02:36:49Z s=3acf4600 FINDING site/src/styles.css:seek and playground demos learn=test: the e2e fit and persistence checks cover it
 2026-11-10T02:55:10Z s=3acf4600 DONE fp=8e5c4a6ab9e3 cov=99.2% paths=.github/workflows/verify.yml
 2026-11-10T02:55:10Z s=3acf4600 FINDING .github/workflows/verify.yml:node job learn=verifier: .vae/VERIFY.py rule ci.build-before-lint; it fails on the old step order and passes on the new
+2026-11-10T10:59:23Z s=b982f14b DONE fp=2b60a51578b5 cov=99.2% paths=docs/404.html,docs/assets/backend-BpSSYiP1.js,docs/assets/backend-But3-ao0.js,docs/assets/index-B6HYNZ1Y.css(+24)
+2026-11-10T10:59:23Z s=b982f14b FINDING site/src/styles.css:.st-fly-stage still composition learn=test: e2e 'flythrough words stand apart' fails on the old stylesheet and passes now, in Chromium (reduced motion) and Firefox
+2026-11-10T10:59:23Z s=b982f14b FINDING site/src/styles.css:.diagram.st-layers node columns learn=test: e2e 'phones and tablets read at 75% type' requires every layer name to be at least 12rem wide at five widths in both languages
+2026-11-10T10:59:23Z s=b982f14b FINDING site/src/styles.css:--st-fly-band learn=none: no behaviour differed (the invalid height computed to auto, the stage's height), so no test can tell the two apart
+2026-11-10T10:59:23Z s=b982f14b FINDING site/e2e/site.test.mjs:apart learn=test: the test is the check; it passes in both engines
+2026-11-10T10:59:23Z s=b982f14b FINDING site/src/styles.css:.st-diagram .diagram-canvas zoom learn=none: a rendered size inside a zoomed third-party canvas is visual; a test would pin the component's zoom floor
+2026-11-10T10:59:23Z s=b982f14b FINDING site/src/chart-options.ts:ONE_ROW_LEGEND learn=none: overlap of SVG text drawn by ECharts is visual; a test on the option object would only pin configuration
+2026-11-10T10:59:23Z s=b982f14b FINDING site/ARCH.md:92 P09, site/ARCH.md:185 P03 learn=verifier: the gate's prose step checks the page
+2026-11-10T11:11:47Z s=b982f14b DONE fp=8ff9d962724a cov=99.2% paths=docs/404.html,docs/assets/backend-But3-ao0.js,docs/assets/backend-DmXCHghL.js,docs/assets/index-B6HYNZ1Y.css(+24)
+2026-11-10T11:11:47Z s=b982f14b FINDING site/src/styles.css:html font-size learn=test: e2e 'phones and tablets read at three quarters of the desktop type size' asserts the root share at five widths; it fails on the old stylesheet
+2026-11-10T11:11:47Z s=b982f14b FINDING site/src/styles.css:.diagram.st-layers node columns learn=test: the type-size e2e test requires every layer name to be at least 12rem wide at five widths in both languages
+2026-11-10T11:11:47Z s=b982f14b FINDING site/src/styles.css:.tabs.st-tabs .st-tab padding learn=none: a probe from 320 to 1920px in both languages reports no clipped tab, button or badge; a test would pin label widths of one font
+2026-11-10T11:11:47Z s=b982f14b FINDING site/src/styles.css:.st-tests, mk-cta threshold, footer columns learn=none: visual measure; the same probe shows the column counts at fifteen widths, and a test would pin copy lengths
+2026-11-10T11:11:47Z s=b982f14b FINDING site/src/chart-options.ts:ONE_ROW_LEGEND, optionsOption xAxis learn=none: positions of SVG text drawn by ECharts are visual; a test on the option object would only pin configuration
+2026-11-10T11:11:47Z s=b982f14b FINDING site/ARCH.md:80-96, 186-187 learn=verifier: the gate's prose step checks the page

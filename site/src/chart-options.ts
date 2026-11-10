@@ -119,13 +119,23 @@ export const OPTION_KEYS: readonly [string, string][] = [
 ];
 const RUNTIME_COLOURS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
 
+/**
+ * A legend that stays one row: entries that do not fit page instead of wrapping.
+ * VERIFIED: (site probe, 390 px wide) a wrapped second row drew over the axis title and the first bars.
+ */
+const ONE_ROW_LEGEND = { top: 0, type: 'scroll', pageIconColor: 'var(--st-accent)', pageIconInactiveColor: 'var(--border)' };
+
 /** Append throughput per option, one series per runtime, on a log axis (78 to 11,000 MiB/s). */
 export function optionsOption(data: SiteData, text: Text): Option {
   return {
-    legend: { top: 0 },
+    legend: ONE_ROW_LEGEND,
     grid: { left: 8, right: 16, top: 40, bottom: 36, containLabel: true },
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (value: number | null) => (value == null ? '-' : `${Math.round(value)} MiB/s`) },
-    xAxis: { type: 'log', name: text('optionsAxis'), nameLocation: 'middle', nameGap: 28, min: 50, max: 20000 },
+    // The axis name ends at the axis end, below the tick labels: centred, it ran past the chart's right edge on a phone,
+    // where the plot is narrower than the name. Tick labels that would collide are left out.
+    // VERIFIED: (site probe, 390, 820 and 1440px wide) with 38px above it the name starts below the tick labels at both type scales.
+    xAxis: { type: 'log', name: text('optionsAxis'), nameLocation: 'end', nameGap: 0, nameTextStyle: { align: 'right', verticalAlign: 'top', padding: [38, 0, 0, 0] },
+      axisLabel: { hideOverlap: true }, min: 50, max: 20000 },
     yAxis: { type: 'category', inverse: true, data: OPTION_KEYS.map(([, label]) => text(label)) },
     series: data.environments.map((environment, index) => ({
       id: environment.id, name: environment.runtime, type: 'bar', barMaxWidth: 10,
@@ -140,7 +150,7 @@ export function overloadOption(data: SiteData, text: Text): Option {
   const versions = Object.keys(data.overload.versions).sort();
   const pick = (field: 'accepted' | 'queueFull' | 'arrayBuffers') => versions.map(version => data.overload.versions[version]![field]);
   return {
-    legend: { top: 0 },
+    legend: ONE_ROW_LEGEND,
     grid: { left: 8, right: 8, top: 40, bottom: 8, containLabel: true },
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: versions },
@@ -159,7 +169,7 @@ export function runOption(cases: readonly { label: string; yours: number; record
     legend: { top: 0 },
     grid: { left: 8, right: 16, top: 36, bottom: 8, containLabel: true },
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (value: number | null) => (value == null ? '-' : `${Math.round(value)} MiB/s`) },
-    xAxis: { type: 'log', name: 'MiB/s', min: 10 },
+    xAxis: { type: 'log', name: 'MiB/s', axisLabel: { hideOverlap: true }, min: 10 },
     yAxis: { type: 'category', inverse: true, data: cases.map(entry => entry.label) },
     series: [
       { id: 'yours', name: text('runYours'), type: 'bar', barMaxWidth: 12, itemStyle: { color: 'var(--st-accent)', borderRadius: [0, 3, 3, 0] }, data: cases.map(entry => Math.round(entry.yours)) },

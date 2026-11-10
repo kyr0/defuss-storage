@@ -400,6 +400,62 @@ describe('site in Chromium', () => {
     record('chromium', 'phone');
   });
 
+  test('phones and tablets read at three quarters of the desktop type size; nothing scrolls sideways and the layer names keep their width', async () => {
+    const seen = [];
+    // The root as a share of the browser's default size: 15px of 16 up to 1024px wide, 20px of 16 above.
+    for (const [width, height, share] of [[390, 844, 0.9375], [820, 1180, 0.9375], [1024, 768, 0.9375], [1025, 768, 1.25], [1440, 900, 1.25]]) {
+      await withContext({ viewport: { width, height } }, async context => {
+        for (const route of ['/en/', '/de/']) {
+          const page = await open(context, route);
+          const facts = await page.evaluate(() => {
+            // `medium` is the browser's default size, whatever the root is set to.
+            const probe = document.body.appendChild(document.createElement('span'));
+            probe.style.fontSize = 'medium';
+            const base = parseFloat(getComputedStyle(probe).fontSize);
+            probe.remove();
+            const root = parseFloat(getComputedStyle(document.documentElement).fontSize);
+            const names = [...document.querySelectorAll('.st-layers .diagram-node-name')].map(name => name.getBoundingClientRect().width / root);
+            return { share: root / base, overflow: document.scrollingElement.scrollWidth - innerWidth, name: Math.min(...names) };
+          });
+          assert.equal(facts.share, share, `${width}px ${route}: root is ${facts.share * 100}% of the default size`);
+          assert.ok(facts.overflow <= 0, `${width}px ${route} scrolls sideways by ${facts.overflow}px`);
+          // The defect: beside its label and note the name column shrank to one letter per line.
+          assert.ok(facts.name >= 12, `${width}px ${route}: a layer name is ${facts.name.toFixed(1)}rem wide`);
+          await page.close();
+        }
+      });
+      seen.push(width);
+    }
+    record('chromium', 'type scale per screen', { widths: seen });
+  });
+
+  test('without scroll timelines and under reduced motion the flythrough words stand apart', async () => {
+    /** The words' boxes: none may cover another by more than a pixel (adjacent lines share an edge), and all lie inside the band. */
+    const apart = page => page.evaluate(() => {
+      const stage = document.querySelector('.st-fly-stage').getBoundingClientRect();
+      const boxes = [...document.querySelectorAll('.st-fly-word')].map(word => word.getBoundingClientRect());
+      const shared = (a, b) => Math.min(Math.min(a.right, b.right) - Math.max(a.left, b.left), Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      const overlaps = boxes.some((a, i) => boxes.some((b, j) => j > i && shared(a, b) > 1));
+      return { words: boxes.length, overlaps, inside: boxes.every(box => box.top >= stage.top && box.bottom <= stage.bottom) };
+    });
+    for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+      await withContext({ viewport, reducedMotion: 'reduce' }, async context => {
+        const page = await open(context, '/en/');
+        assert.deepEqual(await apart(page), { words: 4, overlaps: false, inside: true }, `reduced motion at ${viewport.width}px`);
+        await shot(page.locator('.st-fly-stage'), `flythrough-still-${viewport.width}`);
+      });
+    }
+    record('chromium', 'flythrough still, reduced motion');
+    // Firefox draws the same still composition for another reason: it has no scroll timelines.
+    const browser = await playwright.firefox.launch();
+    try {
+      const page = await open(await browser.newContext({ viewport: { width: 390, height: 844 } }), '/en/');
+      const timelines = await page.evaluate(() => CSS.supports('animation-timeline: view()'));
+      if (!timelines) assert.deepEqual(await apart(page), { words: 4, overlaps: false, inside: true }, 'Firefox without scroll timelines');
+      record('firefox', 'flythrough still', { timelines });
+    } finally { await browser.close(); }
+  });
+
   test('copy buttons put the command and the agent prompt on the clipboard', async () => {
     await withContext({ permissions: ['clipboard-read', 'clipboard-write'] }, async context => {
       const page = await open(context, '/en/#install');

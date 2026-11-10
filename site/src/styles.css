@@ -1,11 +1,17 @@
 /* defuss-storage site: brand tokens over the defuss-shadcn theme, then the page
    layout. Components keep their own styles; this file composes them. */
 
-/* The type scale: every size on the page is in rem, so this one value sets
+/* The type scale: every size on the page is in rem, so the root size sets
    them all, as a share of the browser's default (which keeps a visitor's own
    font setting). The chart reads its size as pixels; registering the property
    makes the rem it is given compute to pixels. */
 html { font-size: 125%; }
+/* Tablets and phones (up to 1024px at the default font setting) read at three
+   quarters of that: 93.75%, 15px instead of 20px at the default setting.
+   A media query measures rem against the browser default, not this root size,
+   so the step cannot move itself. Two rules below repeat this condition, the
+   flythrough band and the flow diagram's zoom: change the three together. */
+@media (max-width: 64rem) { html { font-size: 93.75%; } }
 @property --chart-font-size { syntax: '<length>'; inherits: true; initial-value: 13px; }
 
 :root {
@@ -67,7 +73,10 @@ html { font-size: 125%; }
   .st-page { overflow-x: clip; }
   .st-main { display: flex; flex-direction: column; outline: none; }
   .st-view { display: flex; flex-direction: column; gap: clamp(5rem, 11vw, 9rem); padding-block-end: clamp(5rem, 11vw, 9rem); }
-  .st-section { width: 100%; max-width: 76rem; margin-inline: auto; padding-inline: 1rem; scroll-margin-top: 6.5rem; }
+  /* A section is a query container: the layouts inside switch on its width in rem, which follows
+     the root size, so the same thresholds hold at both type scales. A media query
+     would measure the viewport in the browser's default rem and miss the step. */
+  .st-section { width: 100%; max-width: 76rem; margin-inline: auto; padding-inline: 1rem; scroll-margin-top: 6.5rem; container: st-section / inline-size; }
   .st-display, .mk-hero-title, .mk-section-header-title, .mk-features-title, .mk-cta-title, .st-h2 { font-family: var(--font-display); letter-spacing: -0.025em; }
   .st-icon { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .st-icon-fill { fill: currentColor; stroke: none; }
@@ -154,11 +163,12 @@ html { font-size: 125%; }
   .diagram.st-layers[data-type="layers"] .diagram-canvas > .diagram-node { grid-template-columns: 11rem minmax(0, 1fr) auto; padding-inline: 1.25rem; }
   .st-layers .diagram-node-name { font-size: 1rem; }
   .st-layers .diagram-node-eyebrow, .st-layers .diagram-node-meta { font-size: .875rem; }
-  @media (max-width: 40rem) { .diagram.st-layers[data-type="layers"] .diagram-canvas > .diagram-node { grid-template-columns: minmax(0, 1fr); gap: .25rem; padding-block: .875rem; } }
+  /* Three columns only where the name keeps a readable measure next to the label and the note: on the diagram's own container. */
+  @container (max-width: 56rem) { .diagram.st-layers[data-type="layers"] .diagram-canvas > .diagram-node { grid-template-columns: minmax(0, 1fr); gap: .25rem; padding-block: .875rem; } }
   .st-why { width: 100%; margin-block-start: clamp(4.5rem, 10vw, 7rem); }
   .st-why-title { margin: 0 0 1.75rem; font-family: var(--font-display); font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -.02em; }
-  .st-why-grid { display: grid; gap: 2.25rem 2.5rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); }
-  @media (min-width: 62rem) { .st-why-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  /* As many columns as fit, three at most: a column is never narrower than a third of the row (less the two gaps). */
+  .st-why-grid { display: grid; gap: 2.25rem 2.5rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, max(14.5rem, (100% - 5rem) / 3)), 1fr)); }
   .st-why-item { display: flex; flex-direction: column; gap: .5rem; }
   .st-why-icon { display: grid; place-items: center; width: 3.5rem; height: 3.5rem; font-size: 1.6rem; border-radius: 1rem 1rem 1rem .35rem;
     color: var(--foreground); background: var(--st-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--st-accent) 35%, transparent); }
@@ -167,13 +177,33 @@ html { font-size: 125%; }
   .st-why-item code, .st-demo-text code, .st-use-text code, .st-lead code { font-size: .875em; padding: .05em .3em; border-radius: .3em; background: var(--muted); }
 
   /* flythrough: a viewport-high pinned stage whose middle band shows the shader */
-  .st-flythrough { padding-inline: 1rem; margin-block: calc(-1 * clamp(3rem, 10vh, 8rem)); }
+  .st-flythrough { --st-fly-band: 26rem; padding-inline: 1rem; margin-block: calc(-1 * clamp(3rem, 10vh, 8rem)); }
   .st-fly-stage { background: var(--st-shader-ground); color: #fff; border-radius: var(--radius-xl); overflow: hidden;
-    clip-path: inset(max(0px, calc((100dvh - 26rem) / 2)) 0 round var(--radius-xl)); }
+    clip-path: inset(max(0px, calc((100dvh - var(--st-fly-band)) / 2)) 0 round var(--radius-xl)); }
+  /* at the smaller scale 26rem is a strip of a tall screen: the band keeps at least half the viewport */
+  @media (max-width: 64rem) { .st-flythrough { --st-fly-band: max(26rem, 50dvh); } }
   .st-shader { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .st-fly-word { margin: 0; font-family: var(--font-display); font-size: clamp(3rem, 11vw, 6.5rem); font-weight: 700; letter-spacing: -.045em;
     background: linear-gradient(90deg, oklch(0.9 0.08 186), oklch(0.93 0.17 128)); -webkit-background-clip: text; background-clip: text; color: transparent;
     text-shadow: 0 0 40px oklch(0.17 0.025 215 / .6); }
+  /* The still composition: without scroll timelines (VERIFIED: site probe, Firefox 153) and under
+     reduced motion the component stops the layers, which would leave the four words on top of
+     each other. They stand as a column in a band that scrolls with the page, with no pinned stretch.
+     The block stands twice: CSS cannot join a @supports and a @media condition in one rule. */
+  @supports not (animation-timeline: view()) {
+    .st-flythrough { --st-fly-band: 26rem; margin-block: 0; }
+    .st-flythrough .parallax[data-sticky], .st-fly-stage { height: var(--st-fly-band); }
+    .st-fly-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; clip-path: none; }
+    .st-fly-stage .parallax-layer { position: static; display: block; }
+    .st-fly-word { font-size: clamp(2rem, 7vw, 3.5rem); line-height: 1.25; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .st-flythrough { --st-fly-band: 26rem; margin-block: 0; }
+    .st-flythrough .parallax[data-sticky], .st-fly-stage { height: var(--st-fly-band); }
+    .st-fly-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; clip-path: none; }
+    .st-fly-stage .parallax-layer { position: static; display: block; }
+    .st-fly-word { font-size: clamp(2rem, 7vw, 3.5rem); line-height: 1.25; }
+  }
 
   /* demo window and tabs */
   .st-window { display: flex; flex-direction: column; gap: .75rem; margin-block-start: 2.5rem; padding: clamp(1rem, 2vw, 1.25rem);
@@ -192,8 +222,9 @@ html { font-size: 125%; }
   .tabs.st-tabs { container: st-tabs / inline-size; }
   @container st-tabs (max-width: 63rem) { .tabs.st-tabs .st-tab-desc, .tabs.st-tabs .st-tab > .st-tab-icon { display: none; } .st-tab { justify-content: center; } }
   @container st-tabs (max-width: 50rem) { .tabs.st-tabs > .tab-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-  /* the component flows tabs into columns; two rows of two fit a phone */
-  @container st-tabs (max-width: 35rem) { .tabs.st-tabs > .tab-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  /* The component flows tabs into columns; two rows of two fit a phone. The tabs' side padding gives way
+     there. VERIFIED: (site probe, 320 to 360px wide, 15px root) "Backpressure" was cut with the default padding. */
+  @container st-tabs (max-width: 35rem) { .tabs.st-tabs > .tab-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tabs.st-tabs .st-tab { padding-inline: .375rem; } }
   /* Every demo is two columns that fit one screen: text and controls on the
      left, what happens on the right. Logs, the hex view and the console scroll
      inside their box, so a long run never pushes the window past the viewport.
@@ -203,7 +234,7 @@ html { font-size: 125%; }
   .st-demo-grid[data-demo="persist"] { grid-template-columns: minmax(0, .85fr) minmax(0, 1.3fr); }
   /* the seek list scrolls sideways anyway; its text, stats and code get the room */
   .st-demo-grid[data-demo="seek"] { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
-  @media (max-width: 56rem) { .st-demo-grid, .st-demo-grid[data-demo="persist"], .st-demo-grid[data-demo="seek"] { grid-template-columns: minmax(0, 1fr); } }
+  @container st-tabs (max-width: 41rem) { .st-demo-grid, .st-demo-grid[data-demo="persist"], .st-demo-grid[data-demo="seek"], .st-play-grid { grid-template-columns: minmax(0, 1fr); } }
   .st-demo-side { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
   .st-demo-title { display: flex; align-items: baseline; margin: 0; font-family: var(--font-display); font-size: 1.375rem; letter-spacing: -.015em; }
   .st-demo-text, .st-demo-note { margin: 0; color: var(--muted-foreground); font-size: 1rem; }
@@ -324,7 +355,6 @@ html { font-size: 125%; }
   .st-playground { display: flex; flex-direction: column; gap: 1.25rem; }
   .st-playground-head { display: flex; flex-direction: column; gap: .5rem; max-width: 52rem; }
   .st-play-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
-  @media (max-width: 56rem) { .st-play-grid { grid-template-columns: minmax(0, 1fr); } }
   .st-playground-bar .select { flex: 1 1 12rem; width: auto; min-width: 0; max-width: 100%; }
   .st-editor { flex: 1; display: flex; flex-direction: column; --code-example-pad: 1rem; --code-example-font-size: .875rem; --code-example-line-height: 1.6; border-radius: var(--radius-lg); overflow: hidden; background: var(--card); color: var(--foreground); border: 1px solid var(--st-edge); }
   .st-editor .code-example-panel { position: relative; display: block; flex: 1; border: 0; }
@@ -335,6 +365,10 @@ html { font-size: 125%; }
   /* how it works */
   .st-how { width: 100%; }
   .st-diagram { margin-block: 2rem 0; overflow-x: auto; }
+  /* The component shrinks a canvas wider than its figure (to 70% at most). At the smaller scale that puts
+     the labels at 9px, so there the diagram keeps its size and scrolls sideways. VERIFIED: (site
+     probe, 390 px) 13.1px labels, the component asks for zoom 0.7. !important: it sets zoom inline. */
+  @media (max-width: 64rem) { .st-diagram .diagram-canvas { zoom: 1 !important; } }
   .st-steps { display: grid; gap: 1.5rem 2rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); margin: 3rem 0 0; padding: 0; list-style: none; }
   .st-step { display: flex; gap: .875rem; }
   .st-step-n { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; flex: none; border-radius: .7rem .7rem .7rem .2rem; font: 700 1rem var(--font-mono); color: var(--primary-foreground); background: var(--primary); }
@@ -371,21 +405,22 @@ html { font-size: 125%; }
   .st-range { font-size: .875rem; color: var(--muted-foreground); }
   .st-chart-card { margin: 0; padding: clamp(1rem, 2.5vw, 1.5rem); }
   .st-two { display: grid; gap: 2rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: center; }
-  @media (max-width: 56rem) { .st-two { grid-template-columns: minmax(0, 1fr); } }
+  @container st-section (max-width: 43rem) { .st-two { grid-template-columns: minmax(0, 1fr); } }
 
   /* size and tests */
   .st-quality { --shape-round: 3rem; --shape-ink: color-mix(in oklch, var(--foreground) 9%, transparent); --shape-pattern: 18px;
     padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid var(--border); background-color: color-mix(in oklch, var(--card) 80%, transparent); box-shadow: var(--shadow-xl); }
   .st-quality-grid { display: grid; gap: 1.5rem; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); margin-block-start: 2rem; align-items: center; }
-  @media (max-width: 56rem) { .st-quality-grid { grid-template-columns: minmax(0, 1fr); } }
+  @container st-section (max-width: 43rem) { .st-quality-grid { grid-template-columns: minmax(0, 1fr); } }
   .st-quality .st-chart-card { background: var(--card); border-radius: var(--radius-xl); border: 1px solid var(--border); }
-  .st-tests { display: grid; gap: .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Two cards side by side only where each keeps 12.5rem, a readable line beside its ring; else one column. On the
+     box's own width, so it holds in the half-width column of the quality grid too. */
+  .st-tests { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr)); }
   .st-test { display: flex; flex-direction: column; gap: .25rem; padding: 1rem 1.125rem; border-radius: 1.1rem 1.1rem 1.1rem .35rem; border: 1px solid var(--border); background: var(--card); }
   .st-test-value { font: 700 clamp(1.5rem, 3vw, 2rem)/1.1 var(--font-display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
   .st-test-label { font-size: .875rem; color: var(--muted-foreground); }
   .st-rings .st-test { flex-direction: row; align-items: center; gap: 1rem; }
   .st-rings .radial-progress { --size: 4.5rem; --thickness: .45rem; flex: none; font: 700 1rem var(--font-display); font-variant-numeric: tabular-nums; }
-  @media (max-width: 34rem) { .st-tests.st-rings { grid-template-columns: minmax(0, 1fr); } }
   /* Large files: one card per figure, each with a bar to scale with the file, so the heap and the resident memory read as slivers of it. */
   .st-large-stats { display: flex; flex-direction: column; gap: .75rem; margin: 0; padding: 0; list-style: none; }
   .st-large-stat { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .875rem 1rem; padding: 1rem 1.25rem;
@@ -413,7 +448,8 @@ html { font-size: 125%; }
   .st-consult .mk-cta[data-variant] .mk-cta-title { margin: 0; font-size: clamp(1.25rem, 2.2vw, 1.625rem); }
   .st-consult .mk-cta[data-variant] .mk-cta-desc { grid-column: 2; margin: 0; font-size: 1rem; color: var(--foreground); }
   .st-consult .mk-cta[data-variant] .mk-cta-actions { grid-column: 3; justify-content: flex-end; }
-  @media (max-width: 56rem) {
+  /* three columns only where the title keeps a line of a few words beside the portrait */
+  @container mk-cta (max-width: 56rem) {
     .st-consult .mk-cta[data-variant] .mk-cta-inner { grid-template-columns: minmax(0, 1fr); }
     .st-cta-head, .st-consult .mk-cta[data-variant] .mk-cta-desc, .st-consult .mk-cta[data-variant] .mk-cta-actions { grid-column: auto; justify-content: flex-start; }
   }
@@ -436,7 +472,7 @@ html { font-size: 125%; }
   .st-copy { position: absolute; inset-block-start: 50%; inset-inline-end: .5rem; translate: 0 -50%; }
   /* the command never runs under the copy button */
   .st-install-line .mockup-code > pre { padding-inline-end: 6.5rem; }
-  @media (max-width: 40rem) {
+  @container mk-hero (max-width: 30rem) {
     /* icon only on phones; the label stays the button's accessible name */
     .st-install-line .st-copy span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .st-install-line .mockup-code > pre { padding-inline-end: 3.25rem; }
@@ -449,12 +485,14 @@ html { font-size: 125%; }
   .st-use-tabs .tab-list { margin-block-end: 1rem; }
   .st-use-text { max-width: 52rem; margin: 0 0 1rem; color: var(--muted-foreground); }
   .st-use-pair { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; }
-  @media (max-width: 56rem) { .st-use-pair { grid-template-columns: minmax(0, 1fr); } }
+  @container st-section (max-width: 43rem) { .st-use-pair { grid-template-columns: minmax(0, 1fr); } }
 
   /* API */
   .st-api { display: grid; gap: 1.5rem; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); margin-block-start: 2rem; align-items: start; }
-  @media (max-width: 60rem) { .st-api { grid-template-columns: minmax(0, 1fr); } }
+  @container st-section (max-width: 46rem) { .st-api { grid-template-columns: minmax(0, 1fr); } }
   .st-api-table code { font-size: .875rem; white-space: nowrap; }
+  /* A call stays on one line only where the table has the room; in a narrow one it wraps, so the table fits instead of scrolling sideways. */
+  @container (max-width: 36rem) { .st-api-table code { white-space: normal; } }
   .st-api-table td { vertical-align: top; }
   .st-api-table th { text-align: start; }
   .st-api-table td:last-child { color: var(--muted-foreground); }
@@ -485,13 +523,19 @@ html { font-size: 125%; }
   .st-ad-role, .st-ad-text { margin: 0; font-size: .9375rem; line-height: 1.5; color: var(--foreground); }
   .st-ad-role { font-weight: 500; }
   .st-ad .btn { align-self: flex-start; }
-  @media (min-width: 64rem) { .st-footer-nav.mk-footer-nav { grid-template-columns: 1fr 1fr 1fr 1.8fr; } }
+  /* Four columns where the component shows four: the card column is the wide one, and a link column is never
+     narrower than its longest link. Below that the card takes a row of its own instead of half of one. */
+  .st-footer-nav > .mk-footer-col:last-child { grid-column: 1 / -1; }
+  @container mk-footer (min-width: 52rem) {
+    .st-footer-nav.mk-footer-nav { grid-template-columns: repeat(3, minmax(max-content, 1fr)) 1.8fr; }
+    .st-footer-nav > .mk-footer-col:last-child { grid-column: auto; }
+  }
   /* phones: long button labels wrap and the footer stacks, instead of leaving the screen */
-  @media (max-width: 30rem) {
+  @container st-section (max-width: 22rem) {
     .mk-section-header-actions { min-width: 0; max-width: 100%; }
     .mk-cta-actions .btn, .mk-section-header-actions .btn, .corner-leaf .btn { max-width: 100%; height: auto; min-height: 2.75rem; padding-block: .5rem; white-space: normal; line-height: 1.25; text-align: start; }
-    .st-footer-nav.mk-footer-nav { grid-template-columns: minmax(0, 1fr); }
   }
+  @container mk-footer (max-width: 24rem) { .st-footer-nav.mk-footer-nav { grid-template-columns: minmax(0, 1fr); } }
 
   /* code: token colours follow the page theme; the hero window stays a dark
      terminal, the page's one deliberate dark surface besides the bands */
@@ -499,11 +543,14 @@ html { font-size: 125%; }
   .dark .mockup-code span[style*="--shiki"], .st-hero-window .mockup-code span[style*="--shiki"] { color: var(--shiki-dark); }
   .mockup-code[data-variant="outline"] { border-color: var(--st-edge); }
 
-  /* type floor: nothing readable renders below 14px. VERIFIED: (site e2e size
-     check) every visible text node in both views and themes */
+  /* type floor: .875rem, so nothing readable renders below 14px at the 125% scale (13.1px
+     at the smaller scale of phones and tablets). VERIFIED: (site e2e size check, 1440px wide)
+     every visible text node in both views and themes */
   .btn[data-size="sm"], .badge, .kbd, .kbd[data-size="sm"] { font-size: .875rem; }
   .st-diagram .diagram-group-label, .st-diagram .diagram-node-eyebrow, .st-diagram .diagram-node-meta, .st-diagram .diagram-edge { font-size: .875rem; }
   .st-diagram .diagram-node-name { font-size: 1rem; }
+  /* tighter tracking: STORAGEFILE stays one word in a node at the column minimum */
+  .st-diagram .diagram-node-eyebrow { letter-spacing: .04em; }
   .st-diagram, .st-layers { --diagram-muted: var(--muted-foreground); --diagram-accent: var(--st-accent); }
   .st-diagram .diagram-wire-label { font-size: .875rem; letter-spacing: .01em; text-transform: none; }
   .chart-source, .chart-dek { font-size: .875rem; }

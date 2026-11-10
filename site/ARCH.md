@@ -77,14 +77,24 @@ unused key.
   and every header and footer link then lands on a section of one document.
   VERIFIED: (e2e) the header, sheet and not-found links reach
   `#performance`, and the live run starts from `#run`.
-- The type scale is one rule, `html { font-size: 125% }`: every size in
-  `src/styles.css` is in rem. Breakpoints that must move with it, the header's
-  menu switch and the demo tabs' columns, are container queries. Why not media
-  queries: a media query measures rem against the browser default of 16px, a
-  container query against the root, so only the latter grows with the type.
-  VERIFIED: (site probe, Chromium) with media queries the header nav wrapped
-  at 900 to 1100px wide and tab labels clipped at 1024 to 1512px; with
-  container queries nothing overflows from 320 to 1920px in either language.
+- The type scale is two rules: `html { font-size: 125% }`, and 93.75% in a
+  viewport up to 1024px wide, for phones and tablets: three quarters of the
+  desktop size, 15px instead of 20px at the browser's default setting (the
+  maintainer chose both values, the second on 2026-11-10). Every size in
+  `src/styles.css` is in rem. The layout breakpoints are container queries: on each section, the
+  demo tabs, and the header, hero, call to action and footer components. Why
+  not media queries: a media query measures rem against the browser default
+  of 16px, a container query against the root, so only the latter moves with
+  the type, and one set of thresholds serves both scales. VERIFIED: (site
+  probe, Chromium) with media queries the header nav wrapped at 900 to 1100px
+  wide and tab labels clipped at 1024 to 1512px; with container queries
+  nothing overflows from 320 to 1920px in either language, and a tablet shows
+  the layout a desktop shows at the same width in rem.
+- Without scroll timelines and under reduced motion the flythrough is a band
+  that scrolls with the page, its four words in a column. Why: the parallax
+  component stops its layers there, and stopped layers lie on top of each
+  other. VERIFIED: (e2e) Firefox 153 has no scroll timelines; there and under
+  reduced motion in Chromium no word covers another.
 - `src/theme.ts` and an inline script in `<head>` apply the saved theme or the
   system preference before first paint.
 - ECharts (core, bar, line and custom series, SVG renderer), Shiki for the
@@ -172,7 +182,8 @@ Two checks go beyond axe, because axe skips text over gradients and the
 `aria-hidden` labels a diagram draws. The contrast check walks every visible
 text node in both themes and every demo tab, measures it against the solid
 background and each gradient stop behind it, and requires WCAG AA (4.5:1,
-3:1 for large text) and at least 14px. The motion checks require rotating
+3:1 for large text) and at least 14px at the 125% scale; at the smaller
+scale the smallest text is 13.1px. The motion checks require rotating
 headings to fade through their lines in order, and a language switch to
 update a chart in place instead of drawing it again. VERIFIED: (e2e) all
 pass; before the fixes, a switch redrew the overload chart over about 70
