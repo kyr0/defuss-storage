@@ -33,9 +33,7 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-08T17:01:05Z s=3acf4600 FINDING VALIDATION.md:52 B (evidence) learn=none: replaced by the measured spread
 2026-11-08T17:01:05Z s=3acf4600 FINDING VALIDATION.md:111 B (evidence) learn=none: claim narrowed to macOS arm64 in Not established
 2026-11-08T17:01:05Z s=3acf4600 FINDING VALIDATION.md:117 B (evidence) learn=none: cause of the 0.1 us not established; listed under Not established, no test for a hypothesis
-2026-11-08T17:02:00Z s=3acf4600 DONE fp=ed0b0b293288 cov=99.1% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+34)
 2026-11-08T17:02:00Z s=3acf4600 FINDING VALIDATION.md:15 B (evidence) learn=none: row now gives both observed runs; no source change
-2026-11-08T17:52:31Z s=3acf4600 DONE fp=ca1e09861c99 cov=99.1% paths=.github/workflows/verify.yml,AGENTS.md,ARCH.md,CHANGELOG.md(+40)
 2026-11-08T17:52:31Z s=3acf4600 FINDING scripts/bench-browsers.mjs:page.evaluate learn=none: 30-minute page-side timer resolves with an error; report-only script, no test
 2026-11-08T17:52:31Z s=3acf4600 FINDING scripts/package-test.mjs:writeWorkerConsumer (worker.mjs) learn=none: finally clears the interval; 120 s timeout on the worker consumer run
 2026-11-08T17:52:31Z s=3acf4600 FINDING scripts/package-test.mjs:worker.mjs learn=none: worker.mjs removes its directory; leftovers deleted
@@ -106,3 +104,5 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-10T02:36:49Z s=3acf4600 FINDING site/src/styles.css:html font-size 125% learn=memory: .vae/MEMORY.md: breakpoints that must follow html font-size are container queries
 2026-11-10T02:36:49Z s=3acf4600 FINDING site/index.html:hero snippet, explorer table learn=test: the e2e axe check covers it
 2026-11-10T02:36:49Z s=3acf4600 FINDING site/src/styles.css:seek and playground demos learn=test: the e2e fit and persistence checks cover it
+2026-11-10T02:55:10Z s=3acf4600 DONE fp=8e5c4a6ab9e3 cov=99.2% paths=.github/workflows/verify.yml
+2026-11-10T02:55:10Z s=3acf4600 FINDING .github/workflows/verify.yml:node job learn=verifier: .vae/VERIFY.py rule ci.build-before-lint; it fails on the old step order and passes on the new

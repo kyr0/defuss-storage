@@ -23,8 +23,9 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: bun install --frozen-lockfile
-      - run: bun run lint
+      # Build first: the strict type check covers tests and examples, which import dist/ (as `make lint` does).
       - run: bun run build
+      - run: bun run lint
       # vitest runs on the Node.js selected above (its bin uses `#!/usr/bin/env node`).
       - run: bun run test
       - run: bun run test:package

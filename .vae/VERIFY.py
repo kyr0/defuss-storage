@@ -52,4 +52,11 @@ RULES = [{
                r"jest\.(?:mock|fn|spyOn)\(|vi\.(?:mock|fn|spyOn)\(|sinon\.|gomock\.|mock\.Mock\b|Mockito\.|@Mock\s|mockk\(|"
                r"@Mock(?:ito)?Bean\b|new\s+Mock<|Mock\.Of<|Substitute\.For<|A\.Fake<|mockall:{2}|#\[automock\]",
     "claim": "tests exercise real subsystems, not mock frameworks",
+}, {
+    "id": "ci.build-before-lint",
+    "kind": "regex",
+    "path": ".github/workflows/verify.yml",
+    # VERIFIED: (CI, every run from 438faed to 0178caa) lint before build failed with TS2307 on ../dist imports.
+    "pattern": r"- run: bun run build\n(?:\s*#.*\n)*\s*- run: bun run lint",
+    "claim": "CI builds dist/ before the type check, which reads it through tests and examples",
 }]
