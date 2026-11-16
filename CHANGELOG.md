@@ -1,6 +1,27 @@
 # Changelog
 
-## 0.3.0 (unreleased)
+## 0.3.1 (2026-11-16)
+
+- Reads overlap on writable native handles too (asynchronous I/O, no write
+  buffer). A write, append or truncation waits for the reads called before it
+  and holds back those called after it. Eight 4 KiB reads in flight ran 2.6×
+  faster than one by one.
+- Streams cut chunks below 64 KiB from blocks of up to 64 KiB, one backend read
+  each, and copy every chunk into a buffer of its own. 4 KiB chunks streamed
+  7.6× faster from native files and 1.6× to 4.7× faster from OPFS. A paused
+  stream with small chunks holds one block and one block read ahead instead of
+  two chunks, and a custom backend sees reads of up to 64 KiB for them.
+- Adapters with synchronous I/O (memory, OPFS, native `io: "sync"`) write the
+  input of an idle handle before `write` or `append` returns, without copying
+  it. Admission is unchanged: the call stays reserved until the event loop
+  turns. Awaited 1 MiB appends ran 1.3× (native) to 2.2× (memory) faster.
+- OPFS appends queued together share one write of up to 1 MiB. With 16 in
+  flight, 4 KiB appends ran 2.9× (Chromium) to 6.4× (Firefox) faster.
+- Flushes queued together share one backend flush: an earlier flush resolves
+  with the outcome of a later one. Eight writers that each append and await
+  `flush()` committed 7.6× more often on a native file.
+
+## 0.3.0 (2026-11-09)
 
 - Add the `defuss-storage/directory` entry point: `createDirectoryStorage(handle, options?)`
   stores files in any `FileSystemDirectoryHandle`, such as a folder the user

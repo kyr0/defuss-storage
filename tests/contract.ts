@@ -95,6 +95,16 @@ export const contractCases: ContractCase[] = [
     equal(results, Array.from({ length: 64 }, (_, i) => ({ offset: i * 2, byteLength: 2 })));
     equal([...await f.read(0, 128)], Array.from({ length: 128 }, (_, i) => Math.floor(i / 2)));
     equal(await f.append(data()), { offset: 128, byteLength: 0 });
+    // A burst of small, empty and large inputs, issued behind a queued size(): whatever shares a backend call keeps its place.
+    const sizes = [3, 70_000, 0, 1_100_000, 5, 600_000, 600_000, 1]; const sized = f.size();
+    const burst = await Promise.all(sizes.map((length, i) => f.append(new Uint8Array(length).fill(i + 1))));
+    equal(await sized, 128); let at = 128;
+    for (const [i, length] of sizes.entries()) {
+      equal(burst[i], { offset: at, byteLength: length });
+      if (length) equal([...await f.read(at, 1), ...await f.read(at + length - 1, 1)], [i + 1, i + 1]);
+      at += length;
+    }
+    equal(await f.size(), at);
   }],
   ['EOF, zero-length reads and exact reads are distinct', async ({ open }) => {
     const f = await open(); await f.append(data(4, 5)); equal([...await f.read(1, 9)], [5]); equal([...await f.read(9, 2)], []);

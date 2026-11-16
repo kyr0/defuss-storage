@@ -14,12 +14,14 @@ logical record sources. There is no runtime dependency between these layers.
   The same condition maps to the same code on every adapter: a directory under
   a valid name is `UNSUPPORTED` on native files (lstat) and OPFS
   (`TypeMismatchError`).
-- `file.ts`: one serial operation queue per handle, or overlapping reads within
-  a `maxReadBytes` budget for read-only native handles; admission (operation and
-  write-byte reservations); size tracking; append batching over an optional
-  vectored backend write; partial-I/O completion; independent input/output
-  buffers; borrowed-window revalidation; streams that read one chunk ahead of
-  slow consumers; the opt-in write buffer; buffer hand-off (`transfer`).
+- `file.ts`: one serial operation queue per handle, or reads that overlap
+  between mutations within a `maxReadBytes` budget for native handles with
+  asynchronous I/O; admission (operation and write-byte reservations); size
+  tracking; append batching over an optional vectored backend write; call-time
+  writes on synchronous backends; shared flushes; partial-I/O completion;
+  independent input/output buffers; borrowed-window revalidation; streams that
+  read in blocks of up to 64 KiB, one block ahead of slow consumers; the opt-in
+  write buffer; buffer hand-off (`transfer`).
 - `streams.ts`: `appendChunks` with an optional in-flight window, built only on
   the public `StorageFile` API.
 - `memory.ts`: bounded geometric in-memory file buffers and adapter-local owners.
@@ -27,7 +29,8 @@ logical record sources. There is no runtime dependency between these layers.
   same descriptors (`io: "sync"`), and canonical-path ownership shared by ESM/CJS
   through a versioned global symbol in one JS realm. No multi-process lock claim.
 - `opfs.ts`: dedicated-worker sync-access handles; per-file origin Web Locks held
-  through close. Removing files participates in the same ownership protocol.
+  through close. Removing files participates in the same ownership protocol. Its
+  vectored write joins queued appends into one write of up to 1 MiB.
 - `directory.ts`: any `FileSystemDirectoryHandle` (a picked folder in Chromium,
   or OPFS), in windows and workers. Reads use `getFile()` snapshots; each
   backend write is one committed `createWritable` stream, because an open
@@ -40,14 +43,42 @@ logical record sources. There is no runtime dependency between these layers.
 
 ## Ordering and lifecycle
 
-All accepted operations on one handle execute in invocation order. EOF selection
-and append stay in the same queue task, preventing same-handle append races.
-Read-only native handles are the exception: they have no writes to order
-against, so reads start in call order and run concurrently on libuv's thread
-pool while their lengths together fit `maxReadBytes`. Why that budget instead of
-the operation limit: 1,024 overlapping reads could each allocate up to
-`maxReadBytes`; the byte budget keeps the allocation bound of a serial queue.
-Waiting reads keep call order, so a large read is never starved by small ones.
+All accepted operations on one handle take effect in invocation order. EOF
+selection and append stay in the same queue task, preventing same-handle append
+races.
+
+Native handles with asynchronous I/O and no write buffer let reads
+overlap: reads have nothing to order among themselves, so they start in call
+order and run concurrently on libuv's thread pool while their lengths together
+fit `maxReadBytes`. A mutation (write, append, truncate) is a barrier: it starts
+once every operation accepted before it has settled, and operations accepted
+after it wait for it. Each read therefore sees exactly the mutations called
+before it, as in a serial queue. `size()` and `flush()` run like reads.
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant Q as Handle
+    participant B as Native backend
+    C->>Q: read(a), read(b), write(w), read(c)
+    Q->>B: pread a and pread b, concurrently
+    Note over Q: w waits for a and b, c waits for w
+    B-->>Q: a and b read
+    Q->>B: pwrite w
+    B-->>Q: w written
+    Q->>B: pread c
+    B-->>Q: c read, with the bytes of w
+```
+
+Why barriers instead of overlap on read-only handles alone: a caller that looks
+up and appends through one handle would otherwise read one by one. VERIFIED:
+(interleaved comparison, `VALIDATION.md`) eight 4 KiB reads in flight on a
+writable handle reached 142k reads/s against 54k one by one. Why that budget instead of the operation limit: 1,024
+overlapping reads could each allocate up to `maxReadBytes`; the byte budget
+keeps the allocation bound of a serial queue. Waiting reads keep call order, so
+a large read is never starved by small ones. Why not with a write buffer: the
+read that finds buffered bytes writes them first, which two concurrent reads
+cannot share.
 
 Appends that queue up behind a running operation form a batch; when the first
 one's turn comes, it writes the whole batch at EOF with one vectored backend
@@ -64,7 +95,16 @@ Outcomes stay per append: a member resolves once all its bytes are confirmed;
 a failing call fails every member it carried, because any of their bytes may
 have landed; a member cancelled between partial writes fails alone, and the
 members after it, which no call has carried yet, are written by the next
-batch. Backends without `writev` (memory, OPFS) never batch.
+batch. Backends without `writev` (memory) never batch.
+
+An OPFS sync access handle has no vectored write. The adapter's `writev` copies
+the leading chunks of a batch that fit 1 MiB together into one buffer and
+writes it with one call; the handle writes the remaining chunks with further
+calls, as after any short write. Why copy: VERIFIED: (0.2.0 browser report,
+awaited appends) a 4 KiB OPFS append took 6 µs in Chromium, 45 µs in Firefox
+and 4 µs in WebKit, a 64 KiB append 16, 57 and 12 µs, so the call dominates a
+small write and the bytes do not. The joined buffer is one allocation of at most
+1 MiB per call, outside the admission budget.
 
 ```mermaid
 sequenceDiagram
@@ -112,8 +152,39 @@ operation and a cross-realm ownership protocol; a worker that creates its own
 synchronous adapter needs neither. VERIFIED: (packed-consumer check, Node.js
 20, 24 and 26, Bun 1.4.3) a worker thread running this mode passes the
 consumer's checks, and the main thread's 5 ms timer keeps firing during the
-worker's 200 ms of blocking writes. Read-only handles in this mode do not
-overlap reads, since each read blocks the thread anyway.
+worker's 200 ms of blocking writes. Handles in this mode do not overlap reads,
+since each read blocks the thread anyway.
+
+A backend whose calls are synchronous (memory, OPFS, native `io: "sync"`) lets a
+write or append that finds the handle idle run before the call returns, from
+the caller's bytes: nothing can change them meanwhile, so neither a copy nor a
+queued task is needed. The operation is reserved like a queued one, and the
+reservation stays until the next microtask. Why hold it: calls issued without
+yielding to the event loop are then admitted exactly as when every call was
+queued, so `QUEUE_FULL` does not depend on the adapter; released at once, a
+burst on such a backend would never be refused. The calls after the first in a
+burst therefore queue.
+
+Where the backend has a vectored write, appends below
+64 KiB that come in bursts queue as a whole: the handle notices the second
+append of a burst, queues whole bursts from then on, and returns to call-time
+writes when an append ran alone. VERIFIED: (raw probe, Node.js 26, macOS arm64,
+4 KiB) one `writevSync` of 16 buffers cost 0.6 µs per buffer against 2.3 µs for
+a `writeSync` each, and writing the first append of every burst at call time
+made bursts of 16 0.83 times as fast as queuing all of them. Handles from
+`createStorageFile` always queue: their backends may return promises, and a
+promise from a call-time write would leave the caller's bytes exposed until it
+settles.
+
+A flush whose turn comes while a later flush is queued leaves the backend call
+to that one and resolves with its outcome. The later flush runs after every
+byte written before the earlier one, so it covers both. A flush that another
+relies on always runs its own call: none waits for more than one later flush,
+and a steady stream of flushes cannot postpone the call forever. A failed
+shared flush rejects every flush that relied on it. VERIFIED: (raw probe, macOS
+arm64, APFS, median of 300) an fsync took about 4 ms whether or not bytes were
+written since the previous one; eight write and fsync pairs took 49 ms, eight
+writes and one fsync 9 ms.
 
 The handle tracks the file size instead of asking the backend before each
 append or read. VERIFIED: (probe, native) that query is an `fstat` thread-pool
@@ -160,8 +231,9 @@ charged while the backend is still writing them. Retry loops for partial I/O
 run inside one reserved task and are never counted twice. A batched append
 keeps its own reservation until its own task settles. A buffered append that
 completes on an idle handle reserves nothing, since nothing is queued; the
-write buffer itself is outside the budget. A stream counts one
-operation per chunk read, including a read ahead. `file[Symbol.for("defuss-storage.v0.admission")]`
+write buffer itself is outside the budget. An operation that ran at call time
+on a synchronous backend keeps its reservation until the next microtask. A
+stream counts one operation per block read, including a read ahead. `file[Symbol.for("defuss-storage.v0.admission")]`
 exposes the current counters for tests; it is not semver API.
 
 Budgets are per handle. They bound what one handle retains, not the process:
@@ -191,8 +263,23 @@ Requiring both name and whitelist keeps an unrelated library error with
 `code: "BUSY"` from being reported as ownership contention.
 
 Streams use individual queued reads, so the consumer can pause without
-preventing other operations. They read one chunk ahead only after the consumer
-spent at least 5 µs on the last timed chunk: the first, then every 8th. Why not
+preventing other operations. A chunk of 64 KiB or more is one read. Smaller
+chunks are cut from blocks: as many chunks as fit 64 KiB and `maxReadBytes`,
+read by one backend call into a scratch buffer the stream reuses, each chunk
+then copied into a buffer of its own. Why blocks: VERIFIED: (0.2.0 report)
+4 KiB chunks streamed from native files at 451 MiB/s against 5,514 MiB/s with
+64 KiB chunks, because every chunk paid a thread-pool round trip. Why copies
+instead of views into the block: chunks that share an ArrayBuffer cannot be
+transferred, or handed to `append` with `transfer: true`, one at a time. Why a
+reused scratch buffer: VERIFIED: (interleaved probes, Node.js 26, memory
+adapter, 4 KiB chunks) with a buffer allocated per block the stream ran 0.73
+times as fast as with one read per chunk, with the reused buffer 1.3 to 1.5
+times as fast. A read-ahead that turned stale may still be filling its buffer,
+so that buffer is dropped, not reused.
+
+Streams read one block ahead only after
+the consumer spent at least 5 µs per block, measured on the last timed chunk:
+the first, then every 8th. Why not
 always: VERIFIED: (raw FileHandle probe, Node.js 26, macOS arm64) reading ahead
 of a consumer that spends 2 µs or less per chunk cost 2.7–2.9 µs per chunk,
 about 5 µs broke even, and 10 µs or more saved 4–6 µs; unconditional read-ahead
@@ -202,9 +289,9 @@ every chunk: VERIFIED: (interleaved probes, 4 KiB chunks) the two clock reads
 per chunk cost about 80 ns on the Node.js memory adapter and about 300 ns on
 OPFS in a Chromium worker. Timing every 8th chunk follows a consumer that
 changes speed within 8 chunks. The threshold was measured on macOS only (see
-`VALIDATION.md`). A read ahead is
-used only if no mutation was queued after it and the handle is still open,
-which is when a read at pull time would return the same bytes. Streams pin the
+`VALIDATION.md`). A block read ahead and the rest of a block in use are
+used only if no mutation was queued since their read and the handle is still
+open, which is when a read at pull time would return the same bytes. Streams pin the
 end offset, not a revision: overwrites remain visible. True read snapshots will
 require a record-layer immutable generation/commit design.
 

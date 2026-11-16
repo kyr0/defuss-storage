@@ -1,6 +1,57 @@
 # Validation
 
-## 0.3.0 (unreleased), 2026-11-09
+## 0.3.1, 2026-11-16
+
+Reads that overlap around mutations, block reads for small stream chunks,
+call-time writes with synchronous I/O, joined OPFS appends and shared flushes
+were checked with the 155 tests on Node.js 26.13.0, 24.22.2 and 20.20.2 and on
+Bun 1.4.3, and with the 108 browser tests in Chromium 151, Firefox 153 and
+WebKit 26.5. The 33 contract
+cases are unchanged except for one more burst of mixed sizes in the
+concurrent-append case.
+
+Each figure below compares the build before these changes with the build after
+them in one process, in alternating order per round, and is the median of the
+rounds. The machine ran other jobs throughout (load average 14 to 18 on 18
+logical CPUs), which lowers every value and widens the spread; compare ratios.
+`make bench` was not rerun, so `benchmarks/` still holds the 0.2.0 reports.
+
+| Workload (Node.js 26.13.0, 11 rounds) | Before | After | Ratio |
+| --- | --- | --- | --- |
+| 8 `readInto` of 4 KiB in flight, writable native handle | 54k reads/s | 142k reads/s | 2.6× |
+| Stream, 4 KiB chunks, native file | 120 MiB/s | 911 MiB/s | 7.6× |
+| Stream, 4 KiB chunks, native file, `io: 'sync'` | 1,652 MiB/s | 2,992 MiB/s | 1.8× |
+| Stream, 4 KiB chunks, memory | 2,848 MiB/s | 3,997 MiB/s | 1.4× |
+| Awaited 4 KiB appends, memory | 2,492 MiB/s | 7,240 MiB/s | 2.9× |
+| Awaited 4 KiB appends, `io: 'sync'` (41 rounds) | 591 MiB/s | 694 MiB/s | 1.2× |
+| Awaited 1 MiB appends, memory | 6,892 MiB/s | 15,161 MiB/s | 2.2× |
+| Awaited 1 MiB appends, `io: 'sync'` | 4,553 MiB/s | 5,801 MiB/s | 1.3× |
+| Awaited 4 KiB writes at an offset, memory | 3,022 MiB/s | 7,153 MiB/s | 2.4× |
+| Awaited 4 KiB writes at an offset, `io: 'sync'` | 809 MiB/s | 1,034 MiB/s | 1.3× |
+| 8 writers, each: append 4 KiB, await `flush()`, native file | 261 commits/s | 1,991 commits/s | 7.6× |
+
+| Workload on OPFS (9 rounds), ratio after to before | Chromium 151 | Firefox 153 | WebKit 26.5 |
+| --- | --- | --- | --- |
+| 4 KiB appends, 16 in flight | 2.9× | 6.4× | 3.1× |
+| 4 KiB appends, 256 in flight | 4.3× | 31× | 6.2× |
+| Awaited 4 KiB appends | 1.3× | 1.2× | 1.3× |
+| Awaited 1 MiB appends | 1.6× | 1.5× | 1.5× |
+| Awaited 4 KiB writes at an offset | 1.4× | 1.2× | 1.3× |
+| Stream, 4 KiB chunks | 1.6× | 4.7× | 2.5× |
+| 8 writers, each: append 4 KiB, await `flush()` | 4.2× | 2.5× | 2.3× |
+
+Workloads these changes leave on their old path stayed within the spread of
+their rounds: awaited single `readInto` calls (0.98× to 1.05× over 41 rounds),
+64 KiB stream chunks from the memory adapter (0.95×), awaited 4 KiB appends on
+native files with asynchronous I/O (0.95× to 1.16×) and one writer that appends
+and flushes in turn (1.0×). The 64 KiB stream figures for native files spread
+too widely under this load to compare (0.55× to 1.19× across four runs).
+
+Eight writers that await their append before `flush()` gained between nothing
+and 3.6× across runs: the builds differ only in fsync calls that follow another
+fsync without a write in between, and their cost varied.
+
+## 0.3.0, 2026-11-09
 
 Run on the same machine as 0.2.0 (macOS, Apple arm64). Only these checks ran
 for the directory adapter; the Node.js 24 and 20 and Bun test runs of 0.2.0

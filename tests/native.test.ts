@@ -3,7 +3,7 @@
 // quarantine, and persistence across process boundaries.
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { closeSync, fstatSync, readdirSync } from 'node:fs';
+import { closeSync, fstatSync, readdirSync, statSync } from 'node:fs';
 import { mkdir, stat, symlink, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -118,14 +118,71 @@ describe('read-only handles', () => {
     expect((await b).length).toBe(8192); expect(await c).toBe(4096);
     expect(admission(f)).toEqual({ operations: 0, writeBytes: 0, readBytes: 0 }); await f.close();
   }));
-  test('a failing overlapping read releases its budget; read-write handles never overlap', () => withTempDir('overlap-fail', async dir => {
+  test('a failing overlapping read releases its budget', () => withTempDir('overlap-fail', async dir => {
     const { f } = await readOnly(dir);
     const target = new Uint8Array(new ArrayBuffer(4096, { maxByteLength: 8192 }));
     const failing = f.readInto(0, target); (target.buffer as ArrayBuffer).resize(8192);
     await expect(failing).rejects.toMatchObject({ code: 'IO_ERROR' }); expect(admission(f).readBytes).toBe(0);
     expect((await f.read(0, 4)).length).toBe(4); await f.close();
-    const rw = await (await createFileStorage(dir)).open('data');
-    const reads = [rw.read(0, 4096), rw.read(4096, 4096)]; expect(admission(rw).readBytes).toBe(0);
-    await Promise.all(reads); await rw.close();
+  }));
+});
+
+describe('writable handles', () => {
+  test('reads overlap between mutations; a mutation waits for the reads before it and holds back those after it', () => withTempDir('overlap-rw', async dir => {
+    const s = await createFileStorage(dir); const f = await s.open('data', { create: true });
+    await f.append(new Uint8Array(8192).fill(1));
+    const before = [f.read(0, 4096), f.read(4096, 4096)];
+    const write = f.write(0, new Uint8Array(8192).fill(2)); const after = [f.read(0, 4096), f.readExactly(4096, 4096)];
+    // Only the two reads before the write are running.
+    expect(admission(f)).toEqual({ operations: 5, writeBytes: 8192, readBytes: 8192 });
+    expect((await Promise.all(before)).map(r => [r[0], r[4095]])).toEqual([[1, 1], [1, 1]]); await write;
+    expect((await Promise.all(after)).map(r => [r[0], r[4095]])).toEqual([[2, 2], [2, 2]]);
+    expect(admission(f)).toEqual({ operations: 0, writeBytes: 0, readBytes: 0 });
+    // Close drains reads and mutations alike.
+    const last = [f.read(0, 1), f.append(new Uint8Array([3])), f.read(8192, 1)]; const closing = f.close();
+    expect((await Promise.all(last)).map(r => r instanceof Uint8Array ? r[0] : r.offset)).toEqual([2, 8192, 3]); await closing;
+    // A write buffer is drained by the read that needs it, so those handles keep reading one by one.
+    const b = await s.open('buffered', { create: true, writeBuffer: 64 }); await b.append(new Uint8Array(16));
+    const reads = [b.read(0, 8), b.read(8, 8)]; expect(admission(b).readBytes).toBe(0); await Promise.all(reads); await b.close();
+  }));
+});
+
+describe('synchronous I/O at call time', () => {
+  /** A file with synchronous I/O and its size on disk, which shows what has been written when a call returns. */
+  const opened = async (dir: string, options = {}) => {
+    const f = await (await createFileStorage(dir, { io: 'sync', ...options })).open('data', { create: true });
+    return { f, onDisk: () => statSync(path.join(dir, 'data')).size };
+  };
+  const small = (value: number) => new Uint8Array(100).fill(value);
+  test('an idle handle writes before the call returns and stays reserved until the event loop turns', () => withTempDir('sync-direct', async dir => {
+    const { f, onDisk } = await opened(dir, { maxPendingOperations: 2 });
+    const first = f.append(small(1)); expect(onDisk()).toBe(100);
+    // A burst is admitted as if the first call were still pending: the second queues, the third is refused.
+    expect(admission(f)).toMatchObject({ operations: 1, writeBytes: 100 });
+    const second = f.write(0, small(2)); expect(admission(f)).toMatchObject({ operations: 2, writeBytes: 200 });
+    await expect(f.append(small(3))).rejects.toMatchObject({ code: 'QUEUE_FULL' }); expect(onDisk()).toBe(100);
+    expect(await first).toEqual({ offset: 0, byteLength: 100 }); await second;
+    expect(admission(f)).toMatchObject({ operations: 0, writeBytes: 0 });
+    // A write at an offset takes the same path, and so does a handed-over buffer, which is detached all the same.
+    const write = f.write(100, small(4)); expect(onDisk()).toBe(200); await write;
+    const whole = new Uint8Array(65536).fill(5);
+    const transferred = f.append(whole, { transfer: true }); expect(whole.buffer.byteLength).toBe(0); expect(onDisk()).toBe(65736);
+    expect(await transferred).toEqual({ offset: 200, byteLength: 65536 });
+    expect([...await f.read(0, 1), ...await f.read(100, 1), ...await f.read(65735, 1)]).toEqual([2, 4, 5]); await f.close();
+  }));
+  test('small appends that come in bursts queue as a whole to share one write; an append that ran alone ends that', () => withTempDir('sync-burst', async dir => {
+    const { f, onDisk } = await opened(dir);
+    // The first burst: its first append is written at call time, the others queue.
+    const first = [f.append(small(1)), f.append(small(2)), f.append(small(3))]; expect(onDisk()).toBe(100); await Promise.all(first);
+    // The handle has seen a burst, so the next one queues from its first append on.
+    const second = [f.append(small(4)), f.append(small(5))]; expect(onDisk()).toBe(300);
+    expect((await Promise.all([...first, ...second])).map(r => r.offset)).toEqual([0, 100, 200, 300, 400]);
+    // That append queued and ran alone; the one after it is written at call time again.
+    await f.append(small(6)); const alone = f.append(small(7)); expect(onDisk()).toBe(700); await alone;
+    // Inputs of 64 KiB and more gain nothing from sharing a write: the first of a burst never queues.
+    const large = [f.append(new Uint8Array(65536).fill(8)), f.append(new Uint8Array(65536).fill(9))]; expect(onDisk()).toBe(66236);
+    expect((await Promise.all(large)).map(r => r.offset)).toEqual([700, 66236]);
+    expect((await Promise.all([0, 100, 200, 300, 400, 500, 600, 700, 66236].map(at => f.read(at, 1)))).map(r => r[0])).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(await f.size()).toBe(131772); await f.close();
   }));
 });

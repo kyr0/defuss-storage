@@ -86,7 +86,7 @@ export class MemoryStorage implements StorageAdapter {
       truncate: resize,
       flush: () => undefined,
       close: () => { row.busy = false; },
-    }, { writeBuffer: opts.writeBuffer });
+    }, { writeBuffer: opts.writeBuffer, synchronous: true });
   }
   async list(): Promise<string[]> { return [...this.entries.keys()].sort(); }
   async remove(name: string): Promise<boolean> {

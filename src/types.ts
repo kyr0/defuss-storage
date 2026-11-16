@@ -122,10 +122,12 @@ export interface AppendResult { offset: number; byteLength: number }
 /**
  * An open, exclusively owned byte file.
  *
- * Every operation is queued on the handle and runs in invocation order, so
- * `append` can choose EOF and write without racing other calls on the same
- * handle. A read-only native handle may run reads concurrently; they start in
- * call order and, because nothing writes, return the same bytes. Offsets are explicit; there is no shared seek cursor to corrupt.
+ * Every operation is queued on the handle and takes effect in invocation order,
+ * so `append` can choose EOF and write without racing other calls on the same
+ * handle. A native handle with asynchronous I/O and no write buffer may run
+ * reads concurrently between two mutations; each read still sees exactly the
+ * writes, appends and truncations called before it. Offsets are explicit; there
+ * is no shared seek cursor to corrupt.
  * Validation errors reject before queuing; admission (see {@link AdmissionOptions})
  * rejects QUEUE_FULL before copying any input; operational errors reject with a
  * {@link StorageError} and leave the queue usable.
@@ -147,7 +149,12 @@ export interface StorageFile {
   readInto(offset: number, target: Uint8Array, options?: IOOptions): Promise<number>;
   /** Rejects with UNEXPECTED_EOF rather than silently returning partial input. */
   readExactly(offset: number, length: number, options?: IOOptions): Promise<Uint8Array>;
-  /** Fully writes a call-time copy (or the handed-over buffer, see {@link WriteOptions}). Extending beyond EOF zero-fills the gap. */
+  /**
+   * Fully writes the bytes `data` holds at call time: a copy, the handed-over
+   * buffer (see {@link WriteOptions}), or, where the adapter's I/O is synchronous
+   * and the handle idle, `data` itself before the call returns. Extending beyond
+   * EOF zero-fills the gap.
+   */
   write(offset: number, data: Uint8Array, options?: WriteOptions): Promise<void>;
   /**
    * Serializes EOF selection and write against other operations on this handle.
@@ -157,7 +164,12 @@ export interface StorageFile {
   append(data: Uint8Array, options?: WriteOptions): Promise<AppendResult>;
   /** Shrinks or zero-extends to `size`; discarded bytes never reappear on regrowth. */
   truncate(size: number, options?: IOOptions): Promise<void>;
-  /** Memory: no-op. Native: fsync of this file. OPFS: sync-handle flush. No directory or multi-file durability. */
+  /**
+   * Memory: no-op. Native: fsync of this file. OPFS: sync-handle flush. No
+   * directory or multi-file durability. Flushes queued together share one
+   * backend flush: an earlier one resolves with the outcome of a later one,
+   * which covers every byte written before either.
+   */
   flush(): Promise<void>;
   /**
    * Drains already queued operations, then releases the resource and ownership.
@@ -166,9 +178,11 @@ export interface StorageFile {
    */
   close(): Promise<void>;
   /**
-   * Owned chunks, read one chunk ahead once the consumer spends 5 µs or more per
-   * chunk; a chunk read ahead is read again if a mutation was queued after it.
-   * Does not close this caller-owned handle.
+   * Owned chunks. Chunks below 64 KiB are cut from blocks of up to 64 KiB (and
+   * at most maxReadBytes), each read by one backend call; the next block is read
+   * ahead once the consumer spends 5 µs or more per block. Bytes read before
+   * their pull are read again if a mutation was queued since. Does not close
+   * this caller-owned handle.
    */
   stream(options?: StreamOptions): AsyncIterableIterator<Uint8Array>;
 }

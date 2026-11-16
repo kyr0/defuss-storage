@@ -30,6 +30,28 @@ interface Directory {
   removeEntry(name: string): Promise<void>;
   entries(): AsyncIterableIterator<[string, { kind: string }]>;
 }
+/**
+ * Largest write assembled from queued appends. A sync access handle has no
+ * vectored write, and each call costs far more than copying a small input.
+ * VERIFIED: (recorded 0.2.0 runs, 4 KiB against 64 KiB appends) Chromium wrote
+ * 643 against 3,985 MiB/s, Firefox 86 against 1,094, WebKit 914 against 5,298.
+ * One allocation of at most this size per backend write, outside the admission budget.
+ */
+const JOIN_BYTES = 1024 * 1024;
+/**
+ * The bytes for one backend write: the leading chunks that fit
+ * {@link JOIN_BYTES} together, copied back to back, or the first chunk as it
+ * is when it cannot share. The handle writes the remaining chunks with further calls.
+ */
+function joined(chunks: readonly Uint8Array[]): Uint8Array {
+  let count = 0, total = 0;
+  while (count < chunks.length && total + chunks[count]!.length <= JOIN_BYTES) total += chunks[count++]!.length;
+  if (count < 2) return chunks[0]!;
+  const bytes = new Uint8Array(total);
+  for (let i = 0, at = 0; i < count; at += chunks[i++]!.length) bytes.set(chunks[i]!, at);
+  return bytes;
+}
+
 export interface OPFSStorageOptions extends AdapterOptions {
   /** Namespace below the origin's defuss-storage directory. Default "default". */
   name?: string;
@@ -101,6 +123,7 @@ export class OPFSStorage implements StorageAdapter {
         size: () => sync.getSize(),
         read: (offset, target) => sync.read(target, { at: offset }),
         write: (offset, data) => sync.write(data, { at: offset }),
+        writev: (offset, chunks) => sync.write(joined(chunks), { at: offset }),
         truncate: size => sync.truncate(size),
         flush: () => sync.flush(),
         // No `finally`: if the sync handle cannot be closed the Web Lock stays
@@ -109,7 +132,7 @@ export class OPFSStorage implements StorageAdapter {
         // path is covered by code review only. VERIFIED: (termination scenario,
         // three engines) ending the worker releases its lock for a fresh worker.
         close: async () => { sync.close(); await release(); },
-      }, { writeBuffer: opts.writeBuffer });
+      }, { writeBuffer: opts.writeBuffer, synchronous: true });
     } catch (error) {
       // Cleanup never replaces the open error; an unclosable handle keeps the lock (quarantine).
       let closed = true;

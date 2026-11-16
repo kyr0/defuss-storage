@@ -162,9 +162,10 @@ export class FileStorage implements StorageAdapter {
         // name stays owned (quarantined) until this realm ends. Never retried.
         // VERIFIED: (EBADF quarantine test) later opens and removes reject BUSY.
         close: async () => { await file.close(); release(); },
-        // Async read-only handles let positional preads run concurrently on libuv's
-        // pool; synchronous reads block this thread, so overlapping gains nothing.
-      }, { overlapReads: opts.readOnly && this.io === "async", writeBuffer: opts.writeBuffer });
+        // Asynchronous preads run concurrently on libuv's pool, so reads overlap
+        // between mutations. Synchronous calls block this thread: overlapping
+        // gains nothing there, but an idle handle can write at call time.
+      }, { overlapReads: this.io === "async", synchronous: this.io === "sync", writeBuffer: opts.writeBuffer });
     } catch (error) {
       // Cleanup never replaces the open error. Ownership is released only when
       // no descriptor was acquired or it closed; otherwise it stays quarantined.

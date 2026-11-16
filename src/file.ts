@@ -23,7 +23,7 @@ import type { AppendResult, IOOptions, StorageFile, StreamOptions, WriteOptions 
  * may still be live. `close` is called at most once per handle. `size` is called
  * once per handle and again only after a failed mutation or a short read. `read`
  * is called concurrently only when the adapter enables overlapping reads (the
- * native adapter, for read-only handles); createStorageFile never does.
+ * native adapter with asynchronous I/O); createStorageFile never does.
  * `writev` is optional: with it, appends that queue up behind a running
  * operation are written in one call (see {@link ManagedFile}).
  */
@@ -71,6 +71,25 @@ const READ_AHEAD_AFTER_MS = 0.005;
  */
 const READ_AHEAD_SAMPLE_EVERY = 8;
 /**
+ * A stream cuts chunks smaller than this from blocks of up to this size, each
+ * read by one backend call. Why: a backend call costs far more than a chunk's
+ * copy. VERIFIED: (recorded 0.2.0 runs, 4 KiB against 64 KiB chunks) native
+ * files streamed 451 against 5,514 MiB/s, OPFS in Firefox 199 against 2,477.
+ */
+const STREAM_BLOCK_BYTES = 65536;
+/**
+ * Appends below this size gain from sharing a backend call, so on a synchronous
+ * backend with a vectored write only the first of a burst is written at call
+ * time. VERIFIED: (raw probe, Node 26, macOS arm64, 4 KiB) one writevSync of 16
+ * buffers costs 0.6 µs per buffer against 2.3 µs for a writeSync each; at 64 KiB
+ * the copy a queued append needs costs as much as the call it would save.
+ */
+const BATCH_BYTES = 65536;
+/** Not declared by the ES library types this module compiles against; every supported runtime has it. */
+declare const queueMicrotask: (callback: () => void) => void;
+/** A flush waiting in the queue: whether an earlier flush relies on it, and its outcome. */
+interface QueuedFlush { carries: boolean; done?: Promise<void> }
+/**
  * Moves `data`'s whole buffer to a new owner without copying; `data` is detached
  * afterwards. VERIFIED: (probe) taking a 1 MiB buffer costs 0.1–0.9 µs against
  * 24 µs for a copy. `ArrayBuffer.prototype.transfer` is missing on Node.js 20,
@@ -97,13 +116,16 @@ function settle(outcome: NonNullable<QueuedAppend["outcome"]>): AppendResult {
  * VERIFIED: (contract case "concurrent appends", all adapters) 64 un-awaited
  * appends receive disjoint offsets in invocation order.
  *
- * Overlapping reads: a handle that can never write (read-only) has nothing to
- * order its reads against, so an adapter whose backend reads run off-thread
- * (native files: libuv's thread pool) may let them overlap. They start in call
- * order while the bytes of all running reads fit maxReadBytes together, which
- * keeps the per-handle allocation bound of a serial queue. VERIFIED: (raw probe,
- * macOS arm64, warm cache) 4 KiB preads on one file reached 133k/s one at a time
- * and 303k/s with eight in flight.
+ * Overlapping reads: reads have nothing to order among themselves, so an adapter
+ * whose backend reads run off-thread (native files: libuv's thread pool) may let
+ * them overlap. They start in call order while the bytes of all running reads
+ * fit maxReadBytes together, which keeps the per-handle allocation bound of a
+ * serial queue. A mutation (write, append, truncate) is a barrier: it starts
+ * once every operation accepted before it has settled, and operations accepted
+ * after it wait for it, so each read still sees exactly the mutations called
+ * before it. size() and flush() run like reads. VERIFIED: (raw probe, macOS
+ * arm64, warm cache) 4 KiB preads on one file reached 133k/s one at a time and
+ * 303k/s with eight in flight.
  *
  * Size tracking: the handle is the file's only writer within the ownership
  * contract, so it learns the size from the backend once and then tracks it
@@ -119,6 +141,29 @@ function settle(outcome: NonNullable<QueuedAppend["outcome"]>): AppendResult {
  * promise, offset and admission; one completes only once all its bytes are
  * confirmed. VERIFIED: (raw probe, native, 4 KiB) one writev of 16 buffers costs
  * 1.0 µs per buffer against 8.9 µs for one awaited write each.
+ *
+ * Call-time writes: on a backend whose calls are synchronous, a write or append
+ * that finds the handle idle runs before the call returns, from the caller's
+ * bytes: nothing can change them meanwhile, so neither a copy nor a queued task
+ * is needed. Its reservation stays until the event loop turns. Why hold it: a
+ * burst (calls issued without yielding to the event loop) is then admitted
+ * exactly as when every call was queued, so QUEUE_FULL does not depend on the
+ * adapter; released at once, a burst on such a backend would never be refused.
+ * The rest of a burst therefore queues. With a vectored write, appends below
+ * {@link BATCH_BYTES} that come in bursts queue as a whole and share one backend
+ * call: the handle notices the second append of a burst, queues whole bursts
+ * from then on, and returns to call-time writes when an append ran alone.
+ * VERIFIED: (interleaved probe, Node 26, native sync I/O, 4 KiB) writing the
+ * first append of every burst at call time made bursts of 16 0.83 times as fast
+ * as queuing all of them. VERIFIED: (native sync tests) the bytes are on disk
+ * when the call returns, and the unchanged admission contract cases pass.
+ *
+ * Shared flushes: a flush whose turn comes while a later flush is queued leaves
+ * the backend call to that one and resolves with its outcome, which covers every
+ * byte written before either. A flush that another relies on always runs, so
+ * none waits for more than one later flush. VERIFIED: (raw probe, macOS arm64,
+ * APFS) an fsync costs about 4 ms whether or not bytes are new: eight write and
+ * fsync pairs took 49 ms, eight writes and one fsync 9 ms.
  *
  * Write buffer (opt-in, `writeBuffer` bytes): appends that fit are copied into
  * one per-handle buffer, which is written by one backend call when it fills and
@@ -148,16 +193,34 @@ export class ManagedFile implements StorageFile {
   private writeBytes = 0;
   /** Size after this handle's last completed operation; undefined until queried, or after an uncertain mutation. */
   private knownSize: number | undefined;
-  /** Overlapping mode only: bytes of reads now running, reads waiting for that budget, and every unsettled operation. */
+  /**
+   * Overlapping mode only: bytes of reads now running, reads waiting for that
+   * budget, the unsettled operations accepted since the last mutation, and the
+   * number of unsettled mutations. `tail` then settles after the last mutation.
+   */
   private readBytes = 0;
   private readonly waiting: { bytes: number; start: () => void }[] = [];
-  private readonly unsettled = new Set<Promise<unknown>>();
+  private unsettled = new Set<Promise<unknown>>();
+  private barriers = 0;
   /** Appends queued behind the tail whose batch has not started; later appends join it. Every other queued operation ends it. */
   private group: QueuedAppend[] | undefined;
   /** Mutations queued so far; a stream read-ahead queued before the latest one is stale. */
   private mutations = 0;
-  /** Let reads run concurrently; only for read-only handles whose backend tolerates concurrent reads. */
+  /** Let reads run concurrently; only for backends that tolerate concurrent reads, and never with a write buffer (a read drains it). */
   private readonly overlapReads: boolean;
+  /** Backend calls never return promises, so an idle handle can write at call time. */
+  private readonly synchronous: boolean;
+  /**
+   * Write bytes reserved by the operation that ran at call time in this turn of
+   * the event loop (undefined: none). {@link calm} releases the reservation at
+   * the next microtask.
+   */
+  private held: number | undefined;
+  private readonly calm = (): void => { const bytes = this.held!; this.held = undefined; this.release(bytes); };
+  /** Small appends last came in bursts, so the next one queues for the rest to join it; a batch of one clears it. */
+  private bursty = false;
+  /** The most recently queued flush whose task has not started. */
+  private lastFlush: QueuedFlush | undefined;
   /** Write-buffer capacity in bytes (0: off), the buffer once allocated, and its filled prefix. `knownSize` excludes buffered bytes. */
   private readonly capacity: number;
   private buffer: Uint8Array | undefined;
@@ -167,11 +230,12 @@ export class ManagedFile implements StorageFile {
     readonly readOnly: boolean,
     private readonly limits: HandleLimits,
     private readonly backend: ByteBackend,
-    mode: { overlapReads?: boolean; writeBuffer?: number } = {},
+    mode: { overlapReads?: boolean; writeBuffer?: number; synchronous?: boolean } = {},
   ) {
     this.maxReadBytes = limits.maxReadBytes;
-    this.overlapReads = mode.overlapReads ?? false;
     this.capacity = mode.writeBuffer ?? 0;
+    this.overlapReads = (mode.overlapReads ?? false) && !this.capacity;
+    this.synchronous = mode.synchronous ?? false;
   }
 
   get [ADMISSION](): { operations: number; writeBytes: number; readBytes: number } {
@@ -202,15 +266,18 @@ export class ManagedFile implements StorageFile {
    * probe, memory adapter) counts saved 9–13 ns per read on Bun 1.4.3 and
    * 4–8 ns on Node.js 26.
    */
-  private release(writeBytes: number, readBytes = 0): void {
-    if (this.overlapReads) this.endRead(readBytes);
+  private release(writeBytes: number, readBytes = 0, barrier = false): void {
+    if (barrier) this.barriers--;
+    else if (this.overlapReads) this.endRead(readBytes);
     this.operations--;
     this.writeBytes -= writeBytes;
   }
   /**
    * Runs `task` under an existing reservation and releases it when the task
-   * settles, whatever the outcome. Serial handles append it to the queue;
-   * overlapping handles start it as soon as `readBytes` fit the read budget.
+   * settles, whatever the outcome. Serial handles append it to the queue.
+   * Overlapping handles start a non-mutation once the last mutation has settled
+   * and `readBytes` fit the read budget, and a mutation once everything accepted
+   * before it has settled.
    * A failed `mutation` forgets the tracked size: partial progress leaves it uncertain.
    *
    * One `then(onFulfilled, onRejected)` does release, size invalidation and error
@@ -221,18 +288,28 @@ export class ManagedFile implements StorageFile {
    */
   private enqueue<T>(operation: string, writeBytes: number, task: () => T | Promise<T>, readBytes = 0, mutation = false): Promise<T> {
     if (mutation) this.mutations++;
-    const started = this.overlapReads ? this.startRead(readBytes).then(task) : this.tail.then(task);
-    const result = started.then(value => { this.release(writeBytes, readBytes); return value; }, (error: unknown) => {
-      this.release(writeBytes, readBytes);
+    const shared = this.overlapReads && !mutation;
+    const barrier = this.overlapReads && mutation;
+    let started: Promise<T>;
+    if (shared) started = (this.barriers ? this.tail.then(() => this.startRead(readBytes)) : this.startRead(readBytes)).then(task);
+    else if (this.unsettled.size) {
+      // The reads accepted so far form a closed run; reads accepted from now on wait for this mutation.
+      started = Promise.all([this.tail, ...this.unsettled]).then(task);
+      this.unsettled = new Set();
+    } else started = this.tail.then(task);
+    if (barrier) this.barriers++;
+    const result = started.then(value => { this.release(writeBytes, readBytes, barrier); return value; }, (error: unknown) => {
+      this.release(writeBytes, readBytes, barrier);
       if (mutation) this.knownSize = undefined;
       // Caller validation is performed before queuing; operational failures are normalized.
       throw storageError(error, operation);
     });
     const settled = result.then(() => undefined, () => undefined);
-    if (this.overlapReads) {
+    if (shared) {
       // A set, not a promise chain: one stalled read must not pin every later one in memory.
-      this.unsettled.add(settled);
-      void settled.then(() => this.unsettled.delete(settled));
+      const run = this.unsettled;
+      run.add(settled);
+      void settled.then(() => run.delete(settled));
     } else this.tail = settled;
     return result;
   }
@@ -267,7 +344,7 @@ export class ManagedFile implements StorageFile {
   }
   /** Settles once every operation accepted so far has settled. */
   private drained(): Promise<unknown> {
-    return this.overlapReads ? Promise.all(this.unsettled) : this.tail;
+    return this.overlapReads ? Promise.all([this.tail, ...this.unsettled]) : this.tail;
   }
   /**
    * Admits a write/append input and takes its call-time copy, or its buffer when
@@ -347,14 +424,54 @@ export class ManagedFile implements StorageFile {
       count = await this.backend.read(offset + used, target.subarray(used, length));
     }
   }
-  /** Writes all of `data`, retrying short writes; zero progress throws instead of spinning forever. */
-  private async put(offset: number, data: Uint8Array, options: IOOptions): Promise<void> {
-    let used = 0;
-    while (used < data.length) {
+  /**
+   * Writes all of `data`, retrying short writes; zero progress throws instead of
+   * spinning forever. Completes synchronously while the backend does, like
+   * {@link fill}; a promise hands the rest to {@link finishPut}.
+   */
+  private put(offset: number, data: Uint8Array, options: IOOptions): void | Promise<void> {
+    for (let used = 0; used < data.length;) {
       checkAbort(options.signal);
-      const count = await this.backend.write(offset + used, data.subarray(used));
+      const count = this.backend.write(offset + used, data.subarray(used));
+      if (typeof count !== "number") return this.finishPut(offset, data, options, used, count);
       if (!Number.isSafeInteger(count) || count <= 0 || count > data.length - used) throw new Error("invalid backend write count");
       used += count;
+    }
+  }
+  /** Async continuation of {@link put}, entered only when a backend returns a promise. */
+  private async finishPut(offset: number, data: Uint8Array, options: IOOptions, used: number, pending: Promise<number>): Promise<void> {
+    for (let count = await pending; ; count = await this.backend.write(offset + used, data.subarray(used))) {
+      if (!Number.isSafeInteger(count) || count <= 0 || count > data.length - used) throw new Error("invalid backend write count");
+      used += count;
+      if (used === data.length) return;
+      checkAbort(options.signal);
+    }
+  }
+  /**
+   * Call-time path of write (`offset` given) and append on a synchronous backend:
+   * the handle is idle and nothing is buffered, so the operation runs now, from
+   * the caller's bytes. It is reserved like a queued operation, and the
+   * reservation is held until the event loop turns: the calls after it in a
+   * burst queue and are admitted exactly as if it were still pending. Failures
+   * are normalized as in the queue.
+   */
+  private direct(operation: string, offset: number | undefined, data: Uint8Array, options: WriteOptions, transfer: boolean): AppendResult {
+    this.admit(data.length);
+    this.held = data.length;
+    queueMicrotask(this.calm);
+    this.mutations++;
+    try {
+      // An append needs EOF; a write only keeps a size that is already known.
+      const size = offset === undefined ? this.knownSize ??= integer(this.backend.size() as number, "file size") : this.knownSize;
+      const at = offset ?? size!;
+      range(at, data.length);
+      const input = transfer ? take(data) : data;
+      if (this.put(at, input, options)) throw new Error("synchronous backend returned a promise");
+      if (size !== undefined && input.length) this.knownSize = Math.max(size, at + input.length);
+      return { offset: at, byteLength: input.length };
+    } catch (error) {
+      this.knownSize = undefined;
+      throw storageError(error, operation);
     }
   }
   /**
@@ -424,12 +541,14 @@ export class ManagedFile implements StorageFile {
     }, length);
   }
   /**
-   * Copies `data` at call time, so the caller may reuse its buffer immediately.
+   * Copies `data` at call time, or writes it at call time (see the class
+   * comment), so the caller may reuse its buffer immediately.
    * No rollback: an abort or I/O failure between partial writes leaves the bytes written so far.
    */
   async write(offset: number, data: Uint8Array, options: WriteOptions = {}): Promise<void> {
     bytes(data); range(offset, data.length); this.writeLength(data.length); const transfer = transferOption(data, options);
     this.writable(); this.ensureOpen(); checkAbort(options.signal);
+    if (this.synchronous && !this.operations && !this.buffered) { this.direct("write", offset, data, options, transfer); return; }
     const owned = this.admitCopy(data, transfer);
     this.group = undefined;
     return this.enqueue("write", owned.length, async () => {
@@ -464,6 +583,13 @@ export class ManagedFile implements StorageFile {
       // A buffered append is no batch member, and a later batch must not jump ahead of it.
       this.group = undefined;
       return this.enqueue("append", owned.length, () => this.bufferAppend(owned, options), 0, true);
+    }
+    if (this.synchronous && !this.buffered) {
+      const shareable = this.backend.writev !== undefined && data.length < BATCH_BYTES;
+      if (!this.operations) {
+        if (!shareable || !this.bursty) return this.direct("append", undefined, data, options, transfer);
+        // A small append in the same turn as a call-time operation: bursts queue as a whole from now on.
+      } else if (shareable && this.held !== undefined) this.bursty = true;
     }
     const owned = this.admitCopy(data, transfer);
     const entry: QueuedAppend = { data: owned, options, offset: 0 };
@@ -505,6 +631,7 @@ export class ManagedFile implements StorageFile {
     if (this.buffered) await this.drain();
     if (group.length === 1) {
       // Alone in its batch (the common case for awaited appends): the loop below without its bookkeeping.
+      this.bursty = false;
       checkAbort(first.options.signal);
       const offset = this.knownSize ?? await this.currentSize();
       range(offset, first.data.length);
@@ -551,12 +678,23 @@ export class ManagedFile implements StorageFile {
       this.knownSize = size;
     }, 0, true);
   }
-  /** Allowed on read-only handles: flushing persists nothing new but is harmless. */
+  /**
+   * Allowed on read-only handles: flushing persists nothing new but is harmless.
+   * When its turn comes while a later flush is queued, it leaves the backend
+   * call to that flush and adopts its outcome (see the class comment).
+   */
   async flush(): Promise<void> {
-    return this.run("flush", async () => {
+    const entry: QueuedFlush = { carries: false };
+    const queued = this.run("flush", async () => {
+      const later = this.lastFlush;
+      if (later === entry) this.lastFlush = undefined;
+      else if (later && !entry.carries) { later.carries = true; return later; }
       if (this.buffered) await this.drain();
       await this.backend.flush();
+      return undefined;
     });
+    this.lastFlush = entry;
+    return entry.done = queued.then(later => later?.done);
   }
   /**
    * Marks the handle closed immediately, waits for accepted tasks, then closes
@@ -582,27 +720,35 @@ export class ManagedFile implements StorageFile {
     return this.closing;
   }
   /**
-   * Yields owned chunks of `[start, end)`, reading one chunk ahead of a slow consumer.
+   * Yields owned chunks of `[start, end)`, reading one block ahead of a slow consumer.
    *
-   * Each chunk is its own queued readExactly. When the consumer spent at least
-   * {@link READ_AHEAD_AFTER_MS} on the last timed chunk (the first, then every
-   * {@link READ_AHEAD_SAMPLE_EVERY}th), the read of the next
-   * chunk is queued just before the current one is yielded, so it runs while
-   * the consumer works. A faster consumer gains nothing from the overlap and
-   * would pay for it (see the constant), so its chunks are read at their pull.
-   * A paused consumer therefore holds at most one read chunk, and its queue
-   * slot only until that read settles; a saturated handle skips the read-ahead
-   * rather than take the last slot from other callers.
+   * A block is one queued read: a chunk of {@link STREAM_BLOCK_BYTES} or more,
+   * or as many smaller chunks as fit that size and maxReadBytes, read into a
+   * scratch buffer the stream reuses; each of those is then copied out into a
+   * buffer of its own. VERIFIED: (interleaved probe, Node 26, memory adapter,
+   * 4 KiB chunks) a new buffer per block made the stream 0.73 times as fast as
+   * a read per chunk, since the copy-out costs what the read did. When the consumer spent at
+   * least {@link READ_AHEAD_AFTER_MS} per block (measured on the first chunk,
+   * then every {@link READ_AHEAD_SAMPLE_EVERY}th), the read of the next block is
+   * queued just before the current one is yielded, so it runs while the consumer
+   * works. A faster consumer gains nothing from the overlap and would pay for it
+   * (see the constant), so its blocks are read at their pull. A paused consumer
+   * therefore holds at most the block in use and one read ahead, and a queue slot
+   * only until that read settles; a saturated handle skips the read-ahead rather
+   * than take the last slot from other callers.
    *
    * The end offset is fixed on the first pull (later appends are excluded) but
    * bytes are not snapshotted: overwrites become visible, and a shrink below the
-   * unread range rejects UNEXPECTED_EOF. A read-ahead is used only if no
-   * mutation was queued after it and the handle is still open, which is when a
-   * read at pull time would return the same bytes; otherwise its chunk is read
-   * again at the pull. Its error, if any, surfaces only at that pull. As an async
-   * generator, validation runs on the first `next()`, not when `stream()` is called.
-   * VERIFIED: (contract case "a mutation queued after a read-ahead") a write and
-   * a truncation queued after the read-ahead are seen by its chunk.
+   * unread range rejects UNEXPECTED_EOF at the first chunk that lost bytes. Bytes
+   * read before their pull (the rest of a block, a block read ahead) are used
+   * only if no mutation was queued since and the handle is still open, which is
+   * when a read at pull time would return the same bytes; otherwise the chunk is
+   * read again at its pull. A read-ahead's error, if any, surfaces only at that
+   * pull. As an async generator, validation runs on the first `next()`, not when
+   * `stream()` is called.
+   * VERIFIED: (contract cases "a mutation queued after a read-ahead" and "streams
+   * fix their end") a write and a truncation queued between two pulls are seen
+   * by the next chunk, within a block and across a read-ahead.
    */
   async *stream(options: StreamOptions = {}): AsyncIterableIterator<Uint8Array> {
     const start = integer(options.start ?? 0, "start");
@@ -614,27 +760,58 @@ export class ManagedFile implements StorageFile {
     }
     checkAbort(options.signal);
     const end = Math.min(options.end ?? Number.MAX_SAFE_INTEGER, await this.size());
-    let ahead: { chunk: Promise<Uint8Array>; mutations: number } | undefined;
+    const perBlock = Math.max(1, Math.floor(Math.min(STREAM_BLOCK_BYTES, this.maxReadBytes) / chunkSize));
+    const blockBytes = perBlock * chunkSize;
+    /** A queued block read: its bytes, the scratch buffer they are read into (blocks of several chunks), and the mutations queued before it. */
+    interface Block { bytes: Promise<Uint8Array>; into: Uint8Array | undefined; mutations: number }
+    /** A scratch buffer that no read is using. */
+    let scratch: Uint8Array | undefined;
+    /**
+     * Queues the read of the block at `offset`. A single chunk is its own buffer
+     * and must be complete. A block of several is read into a scratch buffer and
+     * may come back short, so every chunk the file still holds is yielded before
+     * the one that lost bytes fails.
+     */
+    const load = (offset: number): Block => {
+      const length = Math.min(blockBytes, end - offset);
+      if (perBlock === 1) return { bytes: this.readExactly(offset, length, options), into: undefined, mutations: this.mutations };
+      const into = scratch ?? new Uint8Array(Math.min(blockBytes, end - start));
+      scratch = undefined;
+      return { bytes: this.readInto(offset, into.subarray(0, length), options).then(count => into.subarray(0, count)), into, mutations: this.mutations };
+    };
+    let ahead: Block | undefined;
     /** Milliseconds the consumer spent on the last timed chunk. */
     let busy = 0;
     let pulls = 0;
     for (let offset = start; offset < end;) {
       checkAbort(options.signal);
-      const length = Math.min(chunkSize, end - offset);
-      const current = ahead?.mutations === this.mutations && !this.closing ? ahead.chunk : this.readExactly(offset, length, options);
+      // A stale read-ahead may still be writing into its buffer, which is therefore never reused.
+      const current = ahead?.mutations === this.mutations && !this.closing ? ahead : load(offset);
       ahead = undefined;
-      const chunk = await current;
-      offset += length;
-      if (busy >= READ_AHEAD_AFTER_MS && offset < end && this.operations < this.limits.maxPendingOperations) {
-        const next = this.readExactly(offset, Math.min(chunkSize, end - offset), options);
+      const block = await current.bytes;
+      const length = Math.min(blockBytes, end - offset);
+      if (busy * perBlock >= READ_AHEAD_AFTER_MS && offset + length < end && this.operations < this.limits.maxPendingOperations) {
+        ahead = load(offset + length);
         // Handled here so an abandoned read-ahead never surfaces; its own pull still awaits and rethrows it.
-        next.catch(() => undefined);
-        ahead = { chunk: next, mutations: this.mutations };
+        ahead.bytes.catch(() => undefined);
       }
-      const timed = pulls++ % READ_AHEAD_SAMPLE_EVERY === 0;
-      const yielded = timed ? performance.now() : 0;
-      yield chunk;
-      if (timed) busy = performance.now() - yielded;
+      for (let used = 0; used < length;) {
+        if (used) {
+          checkAbort(options.signal);
+          // The rest of the block is stale: read from here again, and drop a read-ahead that started past it.
+          if (current.mutations !== this.mutations || this.closing) { ahead = undefined; break; }
+        }
+        const size = Math.min(chunkSize, length - used);
+        if (block.length < used + size) throw new StorageError("UNEXPECTED_EOF", `defuss-storage: expected ${size} bytes at ${offset}, read ${block.length - used}`);
+        const chunk = current.into ? block.slice(used, used + size) : block;
+        used += size; offset += size;
+        const timed = pulls++ % READ_AHEAD_SAMPLE_EVERY === 0;
+        const yielded = timed ? performance.now() : 0;
+        yield chunk;
+        if (timed) busy = performance.now() - yielded;
+      }
+      // Every chunk was copied out and the read has settled, so its buffer is free again.
+      scratch = current.into ?? scratch;
     }
   }
 }

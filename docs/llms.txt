@@ -1,6 +1,6 @@
 # defuss-storage
 
-> File storage for JavaScript that writes and streams gigabytes per second and reads any offset in microseconds, with one API over the browser's Origin Private File System (OPFS, in a dedicated worker), native files on Node.js and Bun, and memory. Appends return their offset, reads are exact, streams read ahead of slow consumers, and every open file has admission limits and one owner. MIT licensed, no runtime dependencies, 10.6 kB gzipped for the OPFS entry.
+> File storage for JavaScript that writes and streams gigabytes per second and reads any offset in microseconds, with one API over the browser's Origin Private File System (OPFS, in a dedicated worker), native files on Node.js and Bun, and memory. Appends return their offset, reads are exact, streams read ahead of slow consumers, and every open file has admission limits and one owner. MIT licensed, no runtime dependencies, 12.4 kB gzipped for the OPFS entry.
 
 defuss-storage is the byte layer under a database engine, a virtual file system, a cache or an event log. It gives that layer durable files and leaves records, indexes, transactions and recovery to it. It is the backing store of defuss-db, defuss-graph and defuss-vfs, and works on its own.
 

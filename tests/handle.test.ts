@@ -139,19 +139,44 @@ describe('partial and failing backend I/O', () => {
       read: (_at, out) => { reads++; maximum = Math.max(maximum, out.length); out.fill(7); return out.length; },
       write() { throw new Error('unused'); },
     });
-    const stream = f.stream({ chunkSize: 4096 }); expect(reads).toBe(0);
+    const stream = f.stream({ chunkSize: 65536 }); expect(reads).toBe(0);
     // The first pull has no consumer time to go by, so nothing is read ahead yet.
     await stream.next(); await f.size(); expect(reads).toBe(1);
     for (let pulled = 2; pulled <= 4; pulled++) {
-      await pause(); expect((await stream.next()).value!.length).toBe(4096);
+      await pause(); expect((await stream.next()).value!.length).toBe(65536);
       // size() is queued behind the read-ahead, so it has run by now: exactly one chunk ahead.
       await f.size(); expect(reads).toBe(pulled + 1);
     }
-    await stream.return!(undefined); await f.size(); expect(reads).toBe(5); expect(maximum).toBe(4096); await f.close();
+    await stream.return!(undefined); await f.size(); expect(reads).toBe(5); expect(maximum).toBe(65536); await f.close();
+  });
+  test('chunks below 64 KiB are cut from one block read each, as buffers of their own', async () => {
+    /** An 8 GiB source whose byte at `at` is its 4 KiB chunk number; counts backend reads and their largest length. */
+    const source = (maxReadBytes?: number) => {
+      const seen = { reads: 0, maximum: 0 };
+      const f = createStorageFile('blocks', {
+        ...noop, size: () => 8 * 1024 ** 3,
+        read: (at, out) => { seen.reads++; seen.maximum = Math.max(seen.maximum, out.length); for (let i = 0; i < out.length; i += 4096) out.fill((at + i) / 4096, i, i + 4096); return out.length; },
+        write() { throw new Error('unused'); },
+      }, maxReadBytes ? { maxReadBytes } : {});
+      return { f, seen };
+    };
+    const { f, seen } = source(); const stream = f.stream({ chunkSize: 4096 }); const chunks: Uint8Array[] = [];
+    for (let i = 0; i < 20; i++) chunks.push((await stream.next()).value!);
+    expect(chunks.map(chunk => [chunk[0], chunk[4095]])).toEqual(Array.from({ length: 20 }, (_, i) => [i, i]));
+    // Each chunk owns a whole buffer, so it can be kept, handed over or transferred on its own.
+    expect(chunks.every(chunk => chunk.byteOffset === 0 && chunk.buffer.byteLength === 4096)).toBe(true);
+    // Twenty chunks span two blocks; at most one more block was read ahead.
+    await stream.return!(undefined); await f.size();
+    expect(seen.reads).toBeGreaterThanOrEqual(2); expect(seen.reads).toBeLessThanOrEqual(3); expect(seen.maximum).toBe(65536); await f.close();
+    // maxReadBytes bounds a block: two 4 KiB chunks fit 10,000 bytes.
+    const small = source(10_000); const bounded = small.f.stream({ chunkSize: 4096 });
+    for (let i = 0; i < 4; i++) expect((await bounded.next()).value![0]).toBe(i);
+    await bounded.return!(undefined); expect(small.seen.maximum).toBe(8192); await small.f.close();
   });
   test('a read-ahead keeps pull-time outcomes: its error waits for its pull, close wins, and an abandoned one is handled', async () => {
     let reads = 0, failAt = 2;
-    const f = createStorageFile('ahead', { ...noop, size: () => 4, read: (at, out) => { reads++; if (at === failAt) throw codedError('eio', 'EIO'); out.fill(1); return out.length; } });
+    // maxReadBytes 1: one chunk per block, so every chunk is a backend read of its own.
+    const f = createStorageFile('ahead', { ...noop, size: () => 4, read: (at, out) => { reads++; if (at === failAt) throw codedError('eio', 'EIO'); out.fill(1); return out.length; } }, { maxReadBytes: 1 });
     /** Pulls two chunks slowly, so the read of chunk 2 is queued ahead and has run. */
     const twoSlow = async (stream: AsyncIterableIterator<Uint8Array>) => { await stream.next(); await pause(); await stream.next(); await f.size(); };
     const failing = f.stream({ chunkSize: 1 }); await twoSlow(failing); expect(reads).toBe(3);
@@ -336,6 +361,40 @@ describe('write buffer', () => {
     await f.append(new Uint8Array([4])); fault.backend.write = () => { throw codedError('eio', 'EIO'); };
     // The backend still closes (ownership released); close reports the lost bytes.
     await expect(f.close()).rejects.toMatchObject({ code: 'IO_ERROR' }); expect(fault.closes).toBe(1);
+  });
+});
+
+describe('flush sharing', () => {
+  /** A fault backend that logs every backend write and flush. */
+  const logged = () => {
+    const fault = faultBackend(); const log: string[] = []; const { write } = fault.backend;
+    fault.backend.write = (at, input) => { log.push(`write ${at}`); return write.call(fault.backend, at, input); };
+    fault.backend.flush = () => { log.push('flush'); };
+    return { fault, log };
+  };
+  test('flushes queued together share the last one, which runs after every write before it', async () => {
+    const { fault, log } = logged(); const f = createStorageFile('shared', fault.backend);
+    const first = f.flush().then(() => log.push('first resolved'));
+    await Promise.all([first, f.append(new Uint8Array([1])), f.flush(), f.append(new Uint8Array([2])), f.flush()]);
+    expect(log).toEqual(['write 0', 'write 1', 'flush', 'first resolved']);
+    // Awaited one by one, every flush reaches the backend.
+    await f.flush(); await f.flush(); expect(log.filter(entry => entry === 'flush').length).toBe(3); await f.close();
+  });
+  test('a flush that an earlier one waits for runs itself, even when a later flush is queued', async () => {
+    const stall = stalledBackend(); let flushes = 0; stall.backend.flush = () => { flushes++; };
+    const f = createStorageFile('carried', stall.backend);
+    // The first flush hands over to the second; the stalled append between them keeps the second queued.
+    const early = [f.flush(), f.append(new Uint8Array([1])), f.flush()]; await stall.entered;
+    const late = f.flush(); stall.open(); await Promise.all([...early, late]);
+    expect(flushes).toBe(2); await f.close();
+  });
+  test('a failing shared flush rejects every flush that relied on it; the next flush runs again', async () => {
+    const { fault, log } = logged(); const f = createStorageFile('failing', fault.backend);
+    fault.backend.flush = () => { log.push('flush'); throw codedError('eio', 'EIO'); };
+    const settled = await Promise.allSettled([f.flush(), f.flush(), f.flush()]);
+    expect(settled.map(r => r.status === 'rejected' && (r.reason as { code?: string }).code)).toEqual(['IO_ERROR', 'IO_ERROR', 'IO_ERROR']);
+    expect(log).toEqual(['flush']); fault.backend.flush = () => { log.push('flush'); };
+    await f.flush(); expect(log).toEqual(['flush', 'flush']); expect(admission(f)).toEqual({ operations: 0, writeBytes: 0 }); await f.close();
   });
 });
 

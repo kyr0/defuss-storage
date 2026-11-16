@@ -86,11 +86,13 @@ directories are not accepted as file entries: opening or removing one rejects
 also rejects `UNSUPPORTED`. The root directory must be trusted: these checks
 are not a sandbox against another process renaming or replacing its contents.
 
-A read-only native handle runs reads concurrently on libuv's thread pool: they
-start in call order while their lengths together fit `maxReadBytes`, so the
-handle's allocation bound is the same as one read at a time. Read-write
-handles, the memory and OPFS adapters and `createStorageFile` handles run every
-operation one after another.
+A native handle runs reads concurrently on libuv's thread pool: they start in
+call order while their lengths together fit `maxReadBytes`, so the handle's
+allocation bound is the same as one read at a time. A write, append or
+truncation waits for the reads called before it and holds back the reads called
+after it, so every read sees exactly the mutations called before it. Handles
+with a write buffer or synchronous I/O, the memory, OPFS and directory adapters
+and `createStorageFile` handles run every operation one after another.
 
 Native appends that queue up while another operation runs are written by one
 vectored write (`writev`) when their turn comes. A lone append starts at once,
@@ -103,7 +105,9 @@ With `createFileStorage(root, { io: 'sync' })`, every read, write, size query,
 truncation and flush is a blocking call on the calling thread instead of a
 round trip through libuv's thread pool. Use it in a worker thread or a CLI: on
 a server's main thread each call, an fsync or a slow disk included, blocks every
-other task. Read-only handles in this mode run their reads one after another.
+other task. Reads in this mode run one after another. A write or append that
+finds the handle idle is written before the call returns, without a copy of its
+input; see Performance.
 The packed-consumer check runs this mode in a worker thread on Node.js 20, 24
 and 26 and on Bun, and checks that the main thread's timer keeps firing while
 the worker blocks.
@@ -202,11 +206,11 @@ adapter passes partial views as exact copies.
 | `read(offset, length, options?)` | Up to `length` owned bytes; EOF returns an empty array. |
 | `readInto(offset, target, options?)` | Fills the supplied Uint8Array window until full/EOF; returns count; leaves the remainder untouched. |
 | `readExactly(offset, length, options?)` | Returns the full requested range or rejects `UNEXPECTED_EOF`. |
-| `write(offset, bytes, options?)` | Copies input at call time, or takes its buffer with `{transfer: true}`; retries partial writes. Extending a file zero-fills gaps. Empty writes do not extend it. |
-| `append(bytes, options?)` | Queues EOF selection and the complete write together; returns `{offset, byteLength}`. Native appends queued together share one vectored write; see Performance. `{transfer: true}` takes the input's buffer instead of copying it. |
+| `write(offset, bytes, options?)` | Writes the bytes the input holds at call time: a copy, its buffer with `{transfer: true}`, or the input itself before the call returns (synchronous I/O, idle handle); retries partial writes. Extending a file zero-fills gaps. Empty writes do not extend it. |
+| `append(bytes, options?)` | Queues EOF selection and the complete write together; returns `{offset, byteLength}`. Native and OPFS appends queued together share one backend write; see Performance. `{transfer: true}` takes the input's buffer instead of copying it. |
 | `truncate(size, options?)` | Shrinks or zero-extends. |
-| `flush()` | Memory: no-op. Native: file-handle sync. OPFS: sync-access-handle flush. |
-| `stream({start?, end?, chunkSize?, signal?})` | Owned chunks over `[start,end)`, read one chunk ahead of a slow consumer. Default chunk size 64 KiB. |
+| `flush()` | Memory: no-op. Native: file-handle sync. OPFS: sync-access-handle flush. Flushes queued together share one backend flush. |
+| `stream({start?, end?, chunkSize?, signal?})` | Owned chunks over `[start,end)`. Chunks below 64 KiB are cut from blocks of up to 64 KiB, one backend read each; the next block is read ahead of a slow consumer. Default chunk size 64 KiB. |
 | `close()` | Drains previously queued operations, closes/relinquishes ownership; idempotent. Always admitted. |
 
 | Helper | Contract |
@@ -222,21 +226,25 @@ and stream chunk. Set it when creating the adapter.
 `readInto` borrows its target until resolution. Keep it attached and unresized
 until then: a target that is detached or resized (resizable `ArrayBuffer`) while
 queued or between partial reads rejects `IO_ERROR` instead of returning zero
-bytes or reading past the admitted window. Writes own a call-time copy, but
-do not provide atomic commit or rollback. Cancellation and I/O failure can leave
+bytes or reading past the admitted window. A write takes the bytes its input
+holds at call time, but does not provide atomic commit or rollback. Cancellation and I/O failure can leave
 a partial mutation. Signals are checked before queued execution and between
 partial I/O/chunks; they do not interrupt an already running native operation.
 The queue remains usable after an operational failure.
 
 Streams capture the end size on the first pull. Later appends are excluded;
 overwrites can be visible, and shrinking below unread bytes rejects. **Streams
-are not snapshots.** Once the consumer spends 5 µs or more on a chunk (timed
-on the first chunk, then on every 8th), the stream reads the next chunk while
-the consumer works. A paused stream then
-holds that one chunk, and its queue slot only until the read settles. A chunk
-read ahead is read again at its pull if a write, append or truncation was
-queued after it, so it shows the same bytes as a read at pull time; its error,
-if any, also surfaces only at that pull. Each chunk read is one admitted
+are not snapshots.** A chunk of 64 KiB or more is one backend read. Smaller
+chunks are cut from blocks of up to 64 KiB (and at most `maxReadBytes`): one
+backend read per block into a buffer the stream reuses, and every chunk is
+copied out into a buffer of its own. Once the consumer spends 5 µs or more on
+a block (timed on the first chunk, then on every 8th), the stream reads the
+next block while the consumer works. A paused stream then holds the block in
+use and the one read ahead, and a queue slot only until that read settles.
+Bytes read before their pull, in the rest of a block or in a block read ahead,
+are read again at the pull if a write, append or truncation was queued since,
+so every chunk shows the same bytes as a read at pull time; a read-ahead's
+error, if any, also surfaces only at that pull. Each block read is one admitted
 operation, so a pull on a saturated handle rejects `QUEUE_FULL`; the read-ahead
 is skipped instead. Breaking or cancelling a stream does not close the
 caller-owned file. Call `close()` in
@@ -273,6 +281,11 @@ Pass them to `createMemoryStorage`, `createFileStorage`, `createOPFSStorage` or
 bound moves the other default to keep `maxWriteBytes <= maxPendingWriteBytes`;
 setting both inconsistently throws `RangeError`. The defaults are starting
 policies, not measured optima.
+
+Where I/O is synchronous (memory, OPFS, native `io: 'sync'`), a write or append
+that finds the handle idle is written before the call returns. Its reservation
+stays until the event loop turns, so calls issued without awaiting are admitted
+the same way on every adapter.
 
 A call that does not fit rejects `QUEUE_FULL` immediately, without copying and
 without I/O. There is no hidden queue of waiting callers. Get backpressure by
@@ -347,6 +360,8 @@ Figures are from `benchmarks/0.2.0-darwin-arm64.json` (macOS arm64, Node.js
 26.11.1, warm page cache), one `make bench` run at load average 3.5 on 18
 logical CPUs; compare figures within one report. The browser and Bun figures
 come from the `-browsers.json` and `-bun.json` reports of the same run.
+Figures marked 0.3.1 come from interleaved before and after runs on a machine
+under load (`VALIDATION.md`); compare their ratios, not their values.
 
 - **Small awaited appends: use the write buffer or synchronous I/O.** Each async
   native call costs a thread-pool round trip of about 8 µs, whatever its size.
@@ -368,17 +383,32 @@ come from the `-browsers.json` and `-bun.json` reports of the same run.
   as the consumer, 1 MiB chunks streamed at 6,544 MiB/s against 4,822 MiB/s for
   0.1.0, and 64 KiB chunks at 4,426 against 3,177 MiB/s. Faster consumers read
   at the pull: for them the overlap costs more than it hides (see `ARCH.md`).
-- **Open lookup-heavy files read-only.** Eight `readInto` calls in flight on a
-  read-only native handle reached 260k reads/s against 124k for 0.1.0, which ran
-  them one by one. A read-write handle stays serial.
+- **Keep lookups in flight.** Eight `readInto` calls in flight on a read-only
+  native handle reached 260k reads/s against 124k for 0.1.0, which ran them one
+  by one. Writable native handles overlap reads the same way (0.3.1): 142k
+  reads/s against 54k one by one.
+- **Small stream chunks cost one read per block (0.3.1).** 4 KiB chunks from a
+  native file streamed at 911 MiB/s against 120 MiB/s with one read per chunk,
+  1.8× faster with `io: 'sync'`, and 1.6× (Chromium) to 4.7× (Firefox) faster
+  on OPFS.
+- **Flushes queued together share one fsync (0.3.1).** Eight writers that each
+  append 4 KiB and await `flush()` committed 1,991 times per second on a native
+  file against 261 with one fsync each, and 2.3× (WebKit) to 4.2× (Chromium)
+  more often on OPFS.
+- **Synchronous I/O writes an idle handle at call time (0.3.1).** Against a
+  copy and a queued task per call, awaited 4 KiB appends ran 2.9× faster on the
+  memory adapter, 1.2× with `io: 'sync'` and 1.2× to 1.3× on OPFS; awaited
+  1 MiB appends 2.2×, 1.3× and 1.5× to 1.6×.
 - **Hand large buffers over.** `{ transfer: true }` skips the call-time copy,
   which costs about 24 µs per MiB; taking the buffer costs under 1 µs (probe).
   The end-to-end gain varies: this run measured 7,090 MiB/s with transfer
   against 7,805 MiB/s with the copy, with wide, overlapping ranges.
 - **In browsers, buffer small appends.** On OPFS, `writeBuffer: 1 MiB` made
   awaited 4 KiB appends 8.7× (WebKit) to 32× (Firefox) faster, and `transfer`
-  made 1 MiB appends 1.1× to 1.6× faster. `inFlight` gains nothing there: OPFS
-  has no vectored write. Synchronous OPFS reads complete their internal retry
+  made 1 MiB appends 1.1× to 1.6× faster. `appendChunks` gained nothing from
+  `inFlight` there. Appends issued together share one OPFS write (0.3.1): with
+  16 in flight, 4 KiB appends ran 2.9× (Chromium) to 6.4× (Firefox) faster than
+  with one write each. Synchronous OPFS reads complete their internal retry
   loop without an extra async promise. A 4 KiB stream chunk took 1,694 ns in a
   targeted Chromium probe, against 1,707 ns before that final fix and 1,782 ns
   for 0.1.0 (see `VALIDATION.md`).
@@ -465,10 +495,11 @@ Chromium, Firefox and WebKit dedicated workers. Additional tests cover DSON
 framing, a fault matrix of short, invalid and failing backend calls, admission
 accounting against a stalled backend, close-failure quarantine, borrowed
 `readInto` targets, cross-build error codes, ownership across module formats,
-workers and processes, worker termination, append batching, stream read-ahead,
-and pulling four 4 KiB chunks (plus one read ahead) from a synthetic 8 GiB
-source. That last case verifies bounded reads, not an 8 GiB resident-memory
-benchmark.
+workers and processes, worker termination, append batching, shared flushes,
+reads that overlap around a write, call-time writes with synchronous I/O,
+stream read-ahead, and pulling chunks from a synthetic 8 GiB source: 64 KiB
+chunks with one read ahead, and 4 KiB chunks one 64 KiB block at a time. Those
+last cases verify bounded reads, not an 8 GiB resident-memory benchmark.
 
 `bun run test:package` installs the packed artifact in a clean consumer and checks
 ESM, CommonJS, every entry point, synchronous I/O in a worker thread,

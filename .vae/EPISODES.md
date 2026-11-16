@@ -51,21 +51,6 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-09T09:08:09Z s=3acf4600 FINDING CHANGELOG.md:transfer (stale performance claim) learn=none: the changelog now states the measured copy-cost saving and overlapping end-to-end ranges; no timing threshold was added
 2026-11-09T13:01:38Z s=3acf4600 FINDING site/src/demos/storage.worker.ts:limitsFor learn=none: UI clamp; the e2e covers the default budget only
 2026-11-09T13:01:38Z s=3acf4600 FINDING site/index.html:theme-color, site/src/install.ts:copyButton, site/src/messages.ts learn=none: cosmetic; no deterministic check worth adding
-2026-11-09T14:05:47Z s=3acf4600 DONE fp=a44462f783fc cov=99.2% paths=.oxlintrc.json,Makefile,README.md,docs/404.html(+69)
-2026-11-09T14:05:47Z s=3acf4600 FINDING site/vite.config.ts:base learn=test: e2e 'pages opened from disk' and unit test rootUrls
-2026-11-09T14:05:47Z s=3acf4600 FINDING site/build/i18n.ts:localize learn=test: test/build.test.ts repeated-key test
-2026-11-09T14:05:47Z s=3acf4600 FINDING site/src/router.ts:pinImageUrls learn=test: demo e2e fails on any console 404
-2026-11-09T14:44:39Z s=3acf4600 FAIL tests.e2e.1
-2026-11-09T15:10:09Z s=3acf4600 DONE fp=60138d82bd1a cov=99.2% paths=.oxlintrc.json,Makefile,README.md,docs/404.html(+72)
-2026-11-09T15:10:09Z s=3acf4600 FINDING site/index.html:#toast-container learn=test: the axe e2e test fails on it
-2026-11-09T15:10:09Z s=3acf4600 FINDING site/src/demos/status.ts:notify learn=test: demo e2e asserts the toast code spans
-2026-11-09T15:10:09Z s=3acf4600 FINDING site/e2e/site.test.mjs:install commands learn=test: the assertion now checks computed colours, so a markup change that drops highlighting still fails it
-2026-11-09T15:17:33Z s=3acf4600 DONE fp=2397b90737ba cov=99.2% paths=.oxlintrc.json,Makefile,README.md,docs/404.html(+72)
-2026-11-09T15:17:33Z s=3acf4600 FINDING site/index.html:inline file script; site/src/router.ts:go learn=test: the from-disk e2e test switches language and follows a header link in three engines
-2026-11-09T17:23:32Z s=3acf4600 FAIL tests.unit
-2026-11-09T17:24:13Z s=3acf4600 FAIL tests.unit
-2026-11-09T17:39:54Z s=3acf4600 DONE fp=518124022171 cov=99.2% paths=.oxlintrc.json,Makefile,README.md,docs/404.html(+74)
-2026-11-09T17:39:54Z s=3acf4600 FINDING site/src/demos/persist.ts:submit learn=test: demo e2e asserts Append is disabled for an empty line in three engines
 2026-11-09T17:39:54Z s=3acf4600 FINDING site/src/demos/seek.ts:jump learn=test: demo e2e asserts a seek adds no toast
 2026-11-09T17:39:54Z s=3acf4600 FINDING site/src/router.ts:afterCommit learn=test: the WebKit demo test reaches the benchmark by client navigation from deep in the page
 2026-11-09T17:39:54Z s=3acf4600 FINDING site/test/build.test.ts:renderVariant learn=test: the test checks localization, not copy
@@ -106,3 +91,18 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-10T11:11:47Z s=b982f14b FINDING site/src/styles.css:.st-tests, mk-cta threshold, footer columns learn=none: visual measure; the same probe shows the column counts at fifteen widths, and a test would pin copy lengths
 2026-11-10T11:11:47Z s=b982f14b FINDING site/src/chart-options.ts:ONE_ROW_LEGEND, optionsOption xAxis learn=none: positions of SVG text drawn by ECharts are visual; a test on the option object would only pin configuration
 2026-11-10T11:11:47Z s=b982f14b FINDING site/ARCH.md:80-96, 186-187 learn=verifier: the gate's prose step checks the page
+2026-11-10T11:23:09Z s=b982f14b DONE fp=c7895b0b2669 cov=99.2% paths=docs/404.html,docs/assets/backend-DmXCHghL.js,docs/assets/index-BJzDNxX_.js,docs/assets/index-CCvTWAPR.css(+15)
+2026-11-16T11:47:10Z s=b982f14b DONE fp=af59e745d734 cov=99.1% paths=ARCH.md,CHANGELOG.md,README.md,VALIDATION.md(+42)
+2026-11-16T11:47:10Z s=b982f14b FINDING src/file.ts:direct learn=test: the admission contract cases are back to their HEAD text and pass on memory, file, file (sync I/O), OPFS and directory; native test 'an idle handle writes befor
+2026-11-16T11:47:10Z s=b982f14b FINDING src/file.ts:append (bursty) learn=test: native test 'small appends that come in bursts queue as a whole' asserts the file size on disk after each call
+2026-11-16T11:47:10Z s=b982f14b FINDING src/file.ts:stream (scratch buffer) learn=none: timing is report-only in this project; the block contract (one backend read per 64 KiB, chunks with buffers of their own, maxReadBytes bound) is covered by hand
+2026-11-16T11:47:10Z s=b982f14b FINDING src/file.ts:stream (staleness) learn=test: contract cases 'streams fix their end', 'a mutation queued after a read-ahead', 'unexpected truncation during a stream' and 'cancellation' run with 1-byte chunk
+2026-11-16T11:47:10Z s=b982f14b FINDING src/file.ts:enqueue (barriers) learn=test: native test 'reads overlap between mutations' asserts the running read bytes, the bytes each read saw and the drained close; the contract suite runs on writable
+2026-11-16T11:47:10Z s=b982f14b FINDING src/file.ts:flush learn=test: handle tests 'flushes queued together share the last one', 'a flush that an earlier one waits for runs itself' and 'a failing shared flush rejects every flush t
+2026-11-16T11:47:10Z s=b982f14b FINDING src/opfs.ts:joined learn=test: contract case 'concurrent appends return disjoint ordered offsets' issues a burst of 3, 70,000, 0, 1,100,000, 5, 600,000, 600,000 and 1 bytes and checks offsets
+2026-11-16T11:47:10Z s=b982f14b FINDING tests/handle.test.ts:stream tests learn=none: the tests themselves are the check
+2026-11-16T11:47:10Z s=b982f14b FINDING scratchpad perf/compare.mjs (benchmark setup) learn=memory: .vae/MEMORY.md VERIFIED[timing comparisons]: equalize setup garbage before the timed region
+2026-11-16T11:47:10Z s=b982f14b FINDING ARCH.md:Ordering and lifecycle learn=none: page wording; the prose check passes on README.md, ARCH.md, CHANGELOG.md and VALIDATION.md
+2026-11-16T11:47:10Z s=b982f14b FINDING benchmarks/*.json learn=none: report-only figures; a quiet machine is needed to regenerate the reports
+2026-11-16T11:47:10Z s=b982f14b FINDING docs/assets/*.js, docs/*.html learn=none: the site e2e in three browsers passed in the gate's verify step, the limits demo included
+2026-11-16T14:00:31Z s=b982f14b DONE fp=1fd990d5dc2a cov=99.1% paths=ARCH.md,CHANGELOG.md,README.md,VALIDATION.md(+43)
