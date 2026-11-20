@@ -1,6 +1,6 @@
 {
   "name": "defuss-storage",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Isomorphic byte storage with memory, Node.js file, browser OPFS and directory-handle adapters.",
   "type": "module",
   "license": "MIT",
@@ -79,6 +79,7 @@
     "bench": "node --expose-gc scripts/bench.mjs",
     "bench:bun": "bun --expose-gc scripts/bench.mjs",
     "bench:browsers": "node scripts/bench-browsers.mjs chromium firefox webkit",
+    "bench:parallel": "node scripts/bench-parallel.mjs chromium firefox webkit",
     "prepublishOnly": "bun run verify"
   },
   "devDependencies": {

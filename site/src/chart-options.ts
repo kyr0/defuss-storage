@@ -4,7 +4,7 @@
 // the benchmark page repeats the figures in a table.
 // VERIFIED: (test/client.test.ts) series and notes match the published reports. Colours are design tokens that the defuss-shadcn chart
 // component resolves against the element and re-resolves on theme changes.
-import type { Environment, Range, Row, SiteData } from '../build/data.ts';
+import { BASE_VERSION, type Environment, type Range, type Row, type SiteData } from '../build/data.ts';
 
 export type Metric = 'append' | 'pipelined' | 'stream' | 'streamChecksum' | 'readInto';
 export type Adapter = Row['adapter'];
@@ -16,7 +16,8 @@ export const chunkLabel = (chunk: number): string => (chunk >= 1048576 ? `${chun
 /** Fixed bar geometry, so the whiskers can find the centre of each version's bar. */
 const BAR_WIDTH = 34;
 const BAR_GAP = 0.2;
-const VERSION_COLOURS: Record<string, string> = { '0.1.0': 'color-mix(in oklch, var(--muted-foreground) 55%, var(--muted))', '0.2.0': 'var(--st-accent)' };
+/** The base release, then the measured one. */
+const VERSION_COLOURS = ['color-mix(in oklch, var(--muted-foreground) 55%, var(--muted))', 'var(--st-accent)'];
 
 /** The metric's value of one row: a median with its range, or a latency mean (no range). */
 export function metricValue(row: Row, metric: Metric): Range {
@@ -32,7 +33,7 @@ export function rowsFor(environment: Environment, adapter: Adapter, version: str
 /** Grouped bars per chunk size, one series per version, with min-max whiskers. */
 /** `ink` is the resolved whisker colour: custom series draw outside the token resolver. */
 export function explorerOption(environment: Environment, adapter: Adapter, metric: Metric, text: Text, ink: string): Option {
-  const versions = ['0.1.0', '0.2.0'];
+  const versions = [BASE_VERSION, environment.version];
   const categories = CHUNKS.map(chunkLabel);
   const unit = metric === 'readInto' ? text('unitMicros') : text('unitMiBps');
   const series: Option[] = [];
@@ -41,7 +42,7 @@ export function explorerOption(environment: Environment, adapter: Adapter, metri
     const id = `v${version}`;
     series.push({
       id, name: version, type: 'bar', barGap: `${BAR_GAP * 100}%`, barWidth: BAR_WIDTH,
-      itemStyle: { color: VERSION_COLOURS[version], borderRadius: [5, 5, 0, 0] },
+      itemStyle: { color: VERSION_COLOURS[index], borderRadius: [5, 5, 0, 0] },
       data: values.map(value => Number(value.median.toFixed(metric === 'readInto' ? 3 : 1))),
     });
     if (metric !== 'readInto') series.push({
@@ -73,20 +74,38 @@ export function explorerOption(environment: Environment, adapter: Adapter, metri
   };
 }
 
-/** One sentence comparing 0.2.0 with 0.1.0 at the chunk size where the change is largest. */
+/** One sentence comparing the measured release with the base release at the chunk size where the change is largest. */
 export function explorerNote(environment: Environment, adapter: Adapter, metric: Metric, text: Text, format: (value: number, digits?: number) => string): string {
-  const current = rowsFor(environment, adapter, '0.2.0');
-  const previous = rowsFor(environment, adapter, '0.1.0');
+  const current = rowsFor(environment, adapter, environment.version);
+  const previous = rowsFor(environment, adapter, BASE_VERSION);
+  const versions = { version: environment.version, base: BASE_VERSION };
   if (current.length !== CHUNKS.length || previous.length !== CHUNKS.length) return '';
   if (metric === 'readInto') {
     const row = current[0]!;
-    return text('chartNoteLatency', { chunk: chunkLabel(row.chunk), value: format(row.readInto.mean, 2), old: format(previous[0]!.readInto.mean, 2) });
+    return text('chartNoteLatency', { ...versions, chunk: chunkLabel(row.chunk), value: format(row.readInto.mean, 2), old: format(previous[0]!.readInto.mean, 2) });
   }
   const ratios = current.map((row, index) => ({ chunk: row.chunk, ratio: metricValue(row, metric).median / metricValue(previous[index]!, metric).median, row, old: previous[index]! }));
   const best = ratios.reduce((a, b) => (Math.abs(Math.log(b.ratio)) > Math.abs(Math.log(a.ratio)) ? b : a));
   // A "gain" counts only when the slowest new run beats the fastest old one.
   const clear = metricValue(best.row, metric).min > metricValue(best.old, metric).max;
-  return text(clear ? 'chartNoteFaster' : 'chartNoteSlower', { chunk: chunkLabel(best.chunk), ratio: format(best.ratio, best.ratio < 10 ? 1 : 0), metricShort: text('metricShortThroughput') });
+  return text(clear ? 'chartNoteFaster' : 'chartNoteSlower', { ...versions, chunk: chunkLabel(best.chunk), value: format(metricValue(best.row, metric).median), old: format(metricValue(best.old, metric).median) });
+}
+
+/** Whole-scan MiB/s per browser through one owner and through 4 and 8 shared readers, without (`read`) or with (`scan`) decoding work. */
+export function parallelOption(data: SiteData, text: Text, workload: 'read' | 'scan'): Option {
+  const layouts = [['owning x1', 'parallelOne', 'color-mix(in oklch, var(--muted-foreground) 45%, var(--muted))'], ['shared x4', 'parallelFour', 'var(--st-accent-2)'], ['shared x8', 'parallelEight', 'var(--st-accent)']] as const;
+  return {
+    legend: ONE_ROW_LEGEND,
+    grid: { left: 8, right: 8, top: 64, bottom: 8, containLabel: true },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    // Engine names only: the versions would crowd the axis, and the caption names the report.
+    xAxis: { type: 'category', axisLabel: { interval: 0 }, data: data.parallel.browsers.map(browser => browser.runtime.split(' ')[0]) },
+    yAxis: { type: 'value', name: text('unitMiBps'), nameTextStyle: { align: 'left' } },
+    series: layouts.map(([layout, key, color]) => ({
+      id: layout, name: text(key), type: 'bar', barMaxWidth: 28, itemStyle: { color, borderRadius: [4, 4, 0, 0] },
+      data: data.parallel.browsers.map(browser => browser[workload][layout] ?? null),
+    })),
+  };
 }
 
 /** Horizontal bars of the shipped bytes per entry point. */
@@ -151,7 +170,7 @@ export function overloadOption(data: SiteData, text: Text): Option {
   const pick = (field: 'accepted' | 'queueFull' | 'arrayBuffers') => versions.map(version => data.overload.versions[version]![field]);
   return {
     legend: ONE_ROW_LEGEND,
-    grid: { left: 8, right: 8, top: 40, bottom: 8, containLabel: true },
+    grid: { left: 8, right: 8, top: 64, bottom: 8, containLabel: true },
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: versions },
     yAxis: [{ type: 'value', name: 'calls' }, { type: 'value', name: 'MB', splitLine: { show: false } }],

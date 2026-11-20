@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.4.0 (2026-11-20)
+
+- Read-only opens are shared: any number of them can read one file at once, so
+  several workers can scan it in parallel, each over its own byte range. An
+  owning open or a removal rejects `BUSY` while one is open, and a read-only
+  open rejects `BUSY` while an owner is. `shared: false` restores a read-only
+  owner. OPFS and directory handles share across workers and tabs, the native
+  and memory adapters within one realm.
+- Add shared writers: `open(name, { shared: true })` without `readOnly`.
+  Several write one file at explicit offsets; `append` rejects `UNSUPPORTED`,
+  `size()` and `read` ask the file each time, and `writeBuffer` throws
+  `TypeError`. They exclude owners and shared readers. New capability
+  `sharedWriters`: memory, native files and OPFS in Chromium
+  (`readwrite-unsafe` sync access handles); Firefox, WebKit and directory
+  handles reject them `UNSUPPORTED`.
+- OPFS shared readers use read-only sync access handles in Chromium. In Firefox
+  and WebKit, which allow one sync handle per file, the first takes it and the
+  others read `getFile()` snapshots, so a lone reader keeps an owner's speed.
+  With a stand-in decoder and 1 MiB chunks, 4 workers scanned 2.3× to 3.6×
+  faster than one owner and 8 workers 3.3× to 5.5×; 8 shared writers in
+  Chromium wrote 4.0× faster than one owner.
+- OPFS: `flush()` on a read-only handle no longer fails in Chromium, and a sync
+  handle held elsewhere rejects `BUSY` in WebKit too (was `IO_ERROR`).
+- Admission defaults doubled: `maxPendingOperations` 2,048 (was 1,024) and
+  `maxPendingWriteBytes` 128 MiB (was 64 MiB) per handle, so bursts reject
+  `QUEUE_FULL` later. The overload benchmark fires 4,000 appends of 64 KiB
+  (was 2,000): 0.4.0 admitted 2,048 and refused 1,952, and its ArrayBuffer
+  memory peaked at 269 MB against 531 MB for 0.1.0, which buffers every call.
+- `bun run bench:parallel` reports parallel scans, and parallel writes to a
+  file per worker and to one file through shared writers. The benchmark
+  reports in `benchmarks/` and the site's figures are from 0.4.0 runs, and the
+  site shows throughput as MiB/s and GiB/s instead of factors, a section on
+  parallel reads and writes, and examples that scan one file from several
+  workers.
+
 ## 0.3.1 (2026-11-16)
 
 - Reads overlap on writable native handles too (asynchronous I/O, no write

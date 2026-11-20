@@ -62,21 +62,39 @@ function fileBackend(file: FileHandle, io: "async" | "sync"): Omit<ByteBackend, 
 // cooperative ownership, not an OS lock: other processes/workers are excluded
 // from the supported concurrent-writer model.
 const registryKey = Symbol.for("defuss-storage.v0.file-owners");
-/** The realm-global owner set, keyed by canonical file path. `Symbol.for` makes both module builds find the same set. */
-function owners(): Set<string> {
-  const host = globalThis as unknown as { [key: symbol]: Set<string> | undefined };
-  return host[registryKey] ??= new Set<string>();
+const groupKeys = { readers: Symbol.for("defuss-storage.v0.file-readers"), writers: Symbol.for("defuss-storage.v0.file-writers") };
+type Group = keyof typeof groupKeys;
+/**
+ * The realm-global owner set, keyed by canonical file path, and the number of
+ * shared readers and writers per path. `Symbol.for` makes both module builds find the same registry.
+ */
+function registry(): { owners: Set<string> } & Record<Group, Map<string, number>> {
+  const host = globalThis as unknown as { [key: symbol]: unknown };
+  const counts = (key: symbol) => (host[key] ??= new Map<string, number>()) as Map<string, number>;
+  return { owners: (host[registryKey] ??= new Set<string>()) as Set<string>, readers: counts(groupKeys.readers), writers: counts(groupKeys.writers) };
 }
 /**
  * Claims `location` synchronously (before any await) and returns its release
- * function; throws BUSY if it is already owned. Synchronous claiming is what
- * makes two concurrent opens of one name in a realm mutually exclusive.
+ * function. An owner (`group` undefined) throws BUSY if the path is claimed at
+ * all; a shared handle joins the handles of its group there and throws BUSY
+ * against an owner or the other group. Synchronous claiming is what makes
+ * concurrent opens of one name in a realm exclude each other. Why shared
+ * handles also put their path in the owner set: the other group, and an older
+ * copy of this package in the same realm, check only that set.
  */
-function acquire(location: string): () => void {
-  const registry = owners();
-  if (registry.has(location)) throw new StorageError("BUSY", "defuss-storage: file already has an owner");
-  registry.add(location);
-  return () => { registry.delete(location); };
+function acquire(location: string, group?: Group): () => void {
+  const reg = registry();
+  const counts = group && reg[group];
+  const count = counts?.get(location) ?? 0;
+  if (!count && reg.owners.has(location)) throw new StorageError("BUSY", "defuss-storage: file already has an owner");
+  reg.owners.add(location);
+  if (!counts) return () => { reg.owners.delete(location); };
+  counts.set(location, count + 1);
+  return () => {
+    const left = counts.get(location)! - 1;
+    if (left) counts.set(location, left);
+    else { counts.delete(location); reg.owners.delete(location); }
+  };
 }
 /** Throws UNSUPPORTED if `location` exists and is not a regular file (directory, symlink, FIFO, device); absence is fine. */
 async function rejectSpecialFile(location: string): Promise<void> {
@@ -91,8 +109,13 @@ async function rejectSpecialFile(location: string): Promise<void> {
 /**
  * Native adapter over a trusted root directory.
  *
- * Ownership is cooperative within one JS realm: a name has at most one open
- * handle across every FileStorage instance and both module builds. A handle
+ * Ownership is cooperative within one JS realm: a name has at most one owning
+ * handle, or any number of shared readers, or of shared writers, across every
+ * FileStorage instance and both module builds. Worker threads are realms of
+ * their own, so their opens do not exclude each other's: readers or writers in
+ * several workers need no coordination beyond keeping the other kind out. VERIFIED: (probe, Node.js 26.13.1,
+ * 2026-11-20) a worker thread opened, as owner, a file the main thread owned.
+ * A handle
  * whose close failed keeps its name owned for the rest of the realm, since its
  * descriptor may still be live; recovery means ending that process or worker.
  *
@@ -103,7 +126,7 @@ async function rejectSpecialFile(location: string): Promise<void> {
  * a directory reached through a differently cased path. UNKNOWN: Windows NTFS.
  */
 export class FileStorage implements StorageAdapter {
-  readonly capabilities = Object.freeze({ persistent: true, flush: "file", ownership: "realm-cooperative", snapshots: false, atomicReplace: false } as const);
+  readonly capabilities = Object.freeze({ persistent: true, flush: "file", ownership: "realm-cooperative", snapshots: false, atomicReplace: false, sharedWriters: true } as const);
   private constructor(readonly root: string, private readonly limits: HandleLimits, private readonly io: "async" | "sync") {}
   /**
    * Validates options, optionally creates `root`, and canonicalizes it.
@@ -130,7 +153,9 @@ export class FileStorage implements StorageAdapter {
     } catch (error) { throw storageError(error, "create file storage"); }
   }
   /**
-   * Opens a regular file under the root with exclusive in-realm ownership.
+   * Opens a regular file under the root with exclusive in-realm ownership, or
+   * shared with other handles of its kind. Shared writers write through their
+   * own descriptors at explicit offsets.
    *
    * Symlinks are refused twice: `lstat` gives a clear UNSUPPORTED up front, and
    * `O_NOFOLLOW` (where the platform has it) closes the race where a symlink is
@@ -142,7 +167,7 @@ export class FileStorage implements StorageAdapter {
     validateName(name);
     const opts = openOptions(options);
     const location = path.join(this.root, name);
-    const release = acquire(location);
+    const release = acquire(location, opts.shared ? (opts.readOnly ? "readers" : "writers") : undefined);
     let handle: FileHandle | undefined;
     try {
       await rejectSpecialFile(location);
@@ -165,7 +190,7 @@ export class FileStorage implements StorageAdapter {
         // Asynchronous preads run concurrently on libuv's pool, so reads overlap
         // between mutations. Synchronous calls block this thread: overlapping
         // gains nothing there, but an idle handle can write at call time.
-      }, { overlapReads: this.io === "async", synchronous: this.io === "sync", writeBuffer: opts.writeBuffer });
+      }, { overlapReads: this.io === "async", synchronous: this.io === "sync", writeBuffer: opts.writeBuffer, sharedWriter: opts.shared && !opts.readOnly });
     } catch (error) {
       // Cleanup never replaces the open error. Ownership is released only when
       // no descriptor was acquired or it closed; otherwise it stays quarantined.

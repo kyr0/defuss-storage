@@ -1,5 +1,55 @@
 # Validation
 
+## 0.4.0, 2026-11-20
+
+Shared readers and writers were checked with the 161 tests on Node.js 26.13.1,
+24.22.3 and 20.20.2 and on Bun 1.4.3, and with the 119 browser tests in
+Chromium 151.0.7922.34, Firefox 153.0 and WebKit 26.5 (Playwright 1.62.1). The
+contract has 35 cases. The read-only case opens two
+handles, one with the default and one with `shared: true`, reads and streams
+them, and checks that an owning open, a read-only owner (`shared: false`) and a
+removal reject `BUSY`, and that a read-only open rejects `BUSY` while an owner,
+read-only or not, is open. The shared-writer case writes two ranges through
+two handles, reads each other's bytes and size, truncates through one, checks
+that `append` rejects `UNSUPPORTED` and that an owner, a reader and a removal
+reject `BUSY`, and that a writer rejects `BUSY` while a reader is open; where
+`capabilities.sharedWriters` is false (Firefox, WebKit, directory handles) it
+checks `UNSUPPORTED`. The option case adds a shared writer with `writeBuffer`.
+
+The browser suite adds cross-worker scenarios: two workers with shared readers
+on one file while a third gets `BUSY` (OPFS and directory adapter); on OPFS a
+foreign sync access handle then fails in every engine, since one shared reader
+holds a sync handle; two workers writing one OPFS file through shared writers,
+each seeing the other's bytes, or `UNSUPPORTED` in Firefox and WebKit; a
+foreign sync access handle making an open reject `BUSY`, which in WebKit failed
+`IO_ERROR` before (InvalidStateError); and two workers owning different files.
+Defect found by the default: `flush()` on a Chromium read-only sync handle
+threw NoModificationAllowedError (contract case "read-only handles reject all
+mutations"); a read-only handle now skips the backend flush. The packed
+worker-thread consumer reads two halves of a file through two read-only
+handles at once and writes two halves of another through shared writers in
+two worker threads.
+
+The parallel figures in README.md (Parallel reads and writes) come from
+`BENCH_DATASET_MIB=128 BENCH_REPS=5 bun run bench:parallel` at load average 11
+to 16 on 18 logical CPUs. The run before the adaptive readers, at load 5 to 8,
+gave 2.4× to 3.9× at 4 workers and 4.6× to 6.5× at 8, so compare ratios within
+a run, not values.
+
+The reports in `benchmarks/0.4.0-darwin-arm64*.json`, which the site shows,
+come from `make bench` in the same session at load average 11 to 16. The
+Node.js and Bun reports were run again after the admission defaults doubled
+(2,048 operations, 128 MiB) with an overload burst of 4,000 appends of 64 KiB:
+0.4.0 admitted 2,048 and refused 1,952 on both runtimes, peaking at 269 MB
+(Node.js) and 235 MB (Bun) of ArrayBuffers against 531 MB and 515 MB for
+0.1.0. The browser report predates that change; its workloads stay within
+either budget (at most 16 operations in flight). The parallel report is
+`benchmarks/0.4.0-darwin-arm64-parallel.json`, the output of the run quoted in
+README.md. The
+interleaved 0.1.0 baseline in them fell to about half of its 0.2.0-run values
+(native 64 KiB streams 2,477 against 5,300 MiB/s), so their absolute figures
+are lower than the 0.2.0 reports'; compare each with its own 0.1.0 baseline.
+
 ## 0.3.1, 2026-11-16
 
 Reads that overlap around mutations, block reads for small stream chunks,

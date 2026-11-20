@@ -8,7 +8,8 @@
 //     consumer checksums every byte, so read-ahead can overlap reading and work
 //   - random 4 KiB reads (read and readInto): p50/p95/p99 latency, and readInto
 //     throughput with eight calls in flight on a read-only handle
-//   - producer overload: un-awaited appends, with pending high-water marks
+//   - producer overload: un-awaited appends (4,000 of 64 KiB, past both default
+//     budgets of 0.4.0), with pending high-water marks
 //   - slow producer through appendChunks and slow stream consumer (pull-driven)
 //   - this build's opt-in features against its own defaults: write buffer,
 //     buffer hand-off (transfer), appendChunks window, synchronous native I/O
@@ -46,7 +47,7 @@ const ADMISSION = Symbol.for('defuss-storage.v0.admission');
 const env = (key, fallback) => { const v = Number(process.env[key] ?? fallback); if (!Number.isSafeInteger(v) || v < 0) throw new Error(`${key} must be a nonnegative integer`); return v; };
 const config = {
   reps: env('BENCH_REPS', 5), datasetBytes: env('BENCH_DATASET_MIB', 32) * MiB, largeBytes: env('BENCH_LARGE_MIB', 512) * MiB,
-  chunkSizes: [4096, 65536, MiB], randomReads: 2000, randomReadBytes: 4096, overloadCalls: 2000, overloadChunk: 65536,
+  chunkSizes: [4096, 65536, MiB], randomReads: 2000, randomReadBytes: 4096, overloadCalls: 4000, overloadChunk: 65536,
 };
 const { sequentialSuite, optionsSuite } = workloads(config, message => console.error(`${new Date().toISOString()} INFO ${message}`));
 

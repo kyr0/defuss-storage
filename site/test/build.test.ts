@@ -63,10 +63,17 @@ test('figures come from the published reports and are formatted per language', (
   assert.ok(data.sizes.every(size => size.gzip < size.raw && size.brotli < size.gzip));
   const en = figures(data, 'en');
   const de = figures(data, 'de');
-  assert.match(en.wbMin!, /^\d+(\.\d)?$/);
-  assert.equal(de.wbMin, en.wbMin!.replace('.', ','));
+  assert.match(en.wbOnChromium!, /^[\d,.]+ (MiB|GiB)\/s$/);
+  assert.match(de.wbOnChromium!, /^[\d.,]+ (MiB|GiB)\/s$/);
   assert.match(en.opfsGzip!, /^\d+\.\d kB$/);
   assert.equal(fillSlots('{{cpu}} with {{cpus}}', en), `${data.cpu} with ${data.logicalCpus}`);
+  // Parallel throughput: one owner and 8 workers, from the parallel report of the same release.
+  assert.deepEqual(data.parallel.browsers.map(browser => browser.id), ['chromium', 'firefox', 'webkit']);
+  const chromium = data.parallel.browsers[0]!;
+  const rate = (mibps: number) => (mibps >= 1024 ? `${(mibps / 1024).toFixed(2)} GiB/s` : `${mibps.toLocaleString('en-US', { maximumFractionDigits: 0 })} MiB/s`);
+  assert.equal(en.parReadChromium8, rate(chromium.read['shared x8']!));
+  assert.equal(en.parScanChromium1, rate(chromium.scan['owning x1']!));
+  assert.equal(en.parWriteChromium8, rate(chromium.write['shared file x8']!));
   assert.throws(() => fillSlots('{{nope}}', en), /unknown slot/);
 });
 

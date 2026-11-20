@@ -16,19 +16,20 @@ export interface MemoryStorageOptions extends AdapterOptions {
 }
 
 /**
- * One named file. `buffer` is capacity, `size` the logical length.
+ * One named file. `buffer` is capacity, `size` the logical length; `busy`
+ * marks an owning handle, `readers` and `writers` count shared ones.
  * Invariant: `buffer[size..]` is all zero, so growing within capacity zero-fills
  * for free and a shrink-then-grow never revives discarded bytes.
  */
-interface Entry { buffer: Uint8Array; size: number; busy: boolean }
+interface Entry { buffer: Uint8Array; size: number; busy: boolean; readers: number; writers: number }
 
 /**
  * Bytes live in this instance only; two instances never share names.
- * Ownership is the `busy` flag of an entry, so it is exact within the instance
+ * Ownership is the `busy` flag and the shared counts of an entry, so it is exact within the instance
  * (`capabilities.ownership: "instance"`).
  */
 export class MemoryStorage implements StorageAdapter {
-  readonly capabilities = Object.freeze({ persistent: false, flush: "memory", ownership: "instance", snapshots: false, atomicReplace: false } as const);
+  readonly capabilities = Object.freeze({ persistent: false, flush: "memory", ownership: "instance", snapshots: false, atomicReplace: false, sharedWriters: true } as const);
   private readonly entries = new Map<string, Entry>();
   private readonly limits: HandleLimits;
   private readonly maxFileBytes: number;
@@ -43,15 +44,18 @@ export class MemoryStorage implements StorageAdapter {
   async open(name: string, options: OpenOptions = {}): Promise<StorageFile> {
     validateName(name);
     const opts = openOptions(options);
+    const group = opts.shared ? (opts.readOnly ? "readers" : "writers") : undefined;
     let entry = this.entries.get(name);
-    if (entry?.busy) throw new StorageError("BUSY", `defuss-storage: ${name} is open`);
+    if (entry && (entry.busy || (group !== "readers" && entry.readers) || (group !== "writers" && entry.writers))) {
+      throw new StorageError("BUSY", `defuss-storage: ${name} is open`);
+    }
     if (entry && opts.exclusive) throw new StorageError("ALREADY_EXISTS", `defuss-storage: ${name} exists`);
     if (!entry) {
       if (!opts.create) throw new StorageError("NOT_FOUND", `defuss-storage: ${name} does not exist`);
-      entry = { buffer: new Uint8Array(0), size: 0, busy: false };
+      entry = { buffer: new Uint8Array(0), size: 0, busy: false, readers: 0, writers: 0 };
       this.entries.set(name, entry);
     }
-    entry.busy = true;
+    if (group) entry[group]++; else entry.busy = true;
     const row = entry;
     /**
      * Sets the logical size. Capacity grows geometrically (at least doubling,
@@ -85,13 +89,14 @@ export class MemoryStorage implements StorageAdapter {
       },
       truncate: resize,
       flush: () => undefined,
-      close: () => { row.busy = false; },
-    }, { writeBuffer: opts.writeBuffer, synchronous: true });
+      close: () => { if (group) row[group]--; else row.busy = false; },
+    }, { writeBuffer: opts.writeBuffer, synchronous: true, sharedWriter: group === "writers" });
   }
   async list(): Promise<string[]> { return [...this.entries.keys()].sort(); }
   async remove(name: string): Promise<boolean> {
     validateName(name);
-    if (this.entries.get(name)?.busy) throw new StorageError("BUSY", `defuss-storage: ${name} is open`);
+    const entry = this.entries.get(name);
+    if (entry?.busy || entry?.readers || entry?.writers) throw new StorageError("BUSY", `defuss-storage: ${name} is open`);
     return this.entries.delete(name);
   }
 }

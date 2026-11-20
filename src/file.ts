@@ -127,11 +127,14 @@ function settle(outcome: NonNullable<QueuedAppend["outcome"]>): AppendResult {
  * arm64, warm cache) 4 KiB preads on one file reached 133k/s one at a time and
  * 303k/s with eight in flight.
  *
- * Size tracking: the handle is the file's only writer within the ownership
- * contract, so it learns the size from the backend once and then tracks it
- * through its own writes, appends and truncations. A failed mutation or a short
- * read makes it ask the backend again. VERIFIED: (probe, native) the size query
- * is an fstat thread-pool round trip as slow as the I/O it precedes (7.4 µs).
+ * Size tracking: an owning or shared-reader handle is the file's only writer
+ * within the ownership contract, so it learns the size from the backend once
+ * and then tracks it through its own writes, appends and truncations. A failed
+ * mutation or a short read makes it ask the backend again. VERIFIED: (probe,
+ * native) the size query is an fstat thread-pool round trip as slow as the I/O
+ * it precedes (7.4 µs). A shared writer is not the only writer, so its size()
+ * and read() ask the backend every time, and it has no append: choosing EOF
+ * and writing there would race the other writers.
  *
  * Append batching: with a vectored backend write, appends that queue up while
  * another operation runs are written by one call when their turn comes. A lone
@@ -210,6 +213,8 @@ export class ManagedFile implements StorageFile {
   private readonly overlapReads: boolean;
   /** Backend calls never return promises, so an idle handle can write at call time. */
   private readonly synchronous: boolean;
+  /** Other handles write the same file: no size tracking, no append. */
+  private readonly sharedWriter: boolean;
   /**
    * Write bytes reserved by the operation that ran at call time in this turn of
    * the event loop (undefined: none). {@link calm} releases the reservation at
@@ -230,12 +235,13 @@ export class ManagedFile implements StorageFile {
     readonly readOnly: boolean,
     private readonly limits: HandleLimits,
     private readonly backend: ByteBackend,
-    mode: { overlapReads?: boolean; writeBuffer?: number; synchronous?: boolean } = {},
+    mode: { overlapReads?: boolean; writeBuffer?: number; synchronous?: boolean; sharedWriter?: boolean } = {},
   ) {
     this.maxReadBytes = limits.maxReadBytes;
     this.capacity = mode.writeBuffer ?? 0;
     this.overlapReads = (mode.overlapReads ?? false) && !this.capacity;
     this.synchronous = mode.synchronous ?? false;
+    this.sharedWriter = mode.sharedWriter ?? false;
   }
 
   get [ADMISSION](): { operations: number; writeBytes: number; readBytes: number } {
@@ -492,7 +498,10 @@ export class ManagedFile implements StorageFile {
     }
   }
   async size(): Promise<number> {
-    return this.run("size", async () => (this.knownSize ?? await this.currentSize()) + this.buffered);
+    return this.run("size", async () => {
+      if (this.sharedWriter) this.knownSize = undefined;
+      return (this.knownSize ?? await this.currentSize()) + this.buffered;
+    });
   }
   /** Allocates at most min(length, bytes before EOF), so reading past EOF never allocates `length`. */
   async read(offset: number, length: number, options: IOOptions = {}): Promise<Uint8Array> {
@@ -500,6 +509,7 @@ export class ManagedFile implements StorageFile {
     return this.run("read", async () => {
       checkAbort(options.signal);
       if (this.buffered) await this.drain();
+      if (this.sharedWriter) this.knownSize = undefined;
       // The tracked size directly. VERIFIED: (interleaved probe, memory adapter)
       // awaiting the async currentSize() even when the size is known cost about
       // 24 ns per read.
@@ -568,6 +578,7 @@ export class ManagedFile implements StorageFile {
   async append(data: Uint8Array, options: WriteOptions = {}): Promise<AppendResult> {
     bytes(data); this.writeLength(data.length); const transfer = transferOption(data, options);
     this.writable(); this.ensureOpen(); checkAbort(options.signal);
+    if (this.sharedWriter) throw new StorageError("UNSUPPORTED", `defuss-storage: ${this.name} has other writers; write at explicit offsets`);
     if (this.capacity && data.length <= this.capacity) {
       if (this.operations === 0 && this.knownSize !== undefined && this.buffered + data.length <= this.capacity) {
         // Idle handle, known size, room in the buffer: nothing queued can observe this append first.

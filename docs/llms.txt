@@ -1,6 +1,6 @@
 # defuss-storage
 
-> File storage for JavaScript that writes and streams gigabytes per second and reads any offset in microseconds, with one API over the browser's Origin Private File System (OPFS, in a dedicated worker), native files on Node.js and Bun, and memory. Appends return their offset, reads are exact, streams read ahead of slow consumers, and every open file has admission limits and one owner. MIT licensed, no runtime dependencies, 12.4 kB gzipped for the OPFS entry.
+> File storage for JavaScript that writes and streams gigabytes per second and reads any offset in microseconds, with one API over the browser's Origin Private File System (OPFS, in a dedicated worker), native files on Node.js and Bun, and memory. Appends return their offset, reads are exact, streams read ahead of slow consumers, and every open file has admission limits and one owner. MIT licensed, no runtime dependencies, 13.6 kB gzipped for the OPFS entry.
 
 defuss-storage is the byte layer under a database engine, a virtual file system, a cache or an event log. It gives that layer durable files and leaves records, indexes, transactions and recovery to it. It is the backing store of defuss-db, defuss-graph and defuss-vfs, and works on its own.
 
@@ -23,32 +23,41 @@ Node.js 20.19 or newer, Bun, or a browser with OPFS; Chromium, Firefox and WebKi
 
 ## Browser: storage in a dedicated module worker
 
-OPFS synchronous access handles exist only in dedicated workers, on HTTPS or localhost. The worker owns the files; the page sends it messages. Vite, webpack and esbuild bundle the worker from the `new URL()` form.
+OPFS synchronous access handles exist only in dedicated workers, on HTTPS or localhost. Read-only opens are shared, so one worker per core can scan one file, each its own byte range; the page sends each worker its range. Vite, webpack and esbuild bundle the worker from the `new URL()` form.
 
 ```js
 // storage.worker.js
 import { createOPFSStorage } from 'defuss-storage/opfs';
 
 const storage = await createOPFSStorage({ name: 'notes' });
-const file = await storage.open('notes.log', { create: true });
 
-self.onmessage = async ({ data }) => {
-  const bytes = new TextEncoder().encode(data + '\n');
-  const receipt = await file.append(bytes);
-  await file.flush();
-  self.postMessage(receipt); // { offset, byteLength }
+// Read-only opens are shared: every worker reads notes.log at once.
+self.onmessage = async ({ data: { start, end } }) => {
+  const file = await storage.open('notes.log', { readOnly: true });
+  let lines = 0;
+  try {
+    for await (const chunk of file.stream({ start, end, chunkSize: 1024 * 1024 })) {
+      for (const byte of chunk) if (byte === 10) lines++;
+    }
+  } finally {
+    await file.close();
+  }
+  self.postMessage(lines);
 };
 ```
 
 ```js
 // main.js
-const worker = new Worker(
-  new URL('./storage.worker.js', import.meta.url),
-  { type: 'module' },
-);
-
-worker.onmessage = ({ data }) => console.log('stored at', data.offset);
-worker.postMessage('first note');
+// One worker per core, each counting the lines of its byte range.
+const size = 256 * 1024 * 1024; // notes.log's size, e.g. from file.size()
+const count = navigator.hardwareConcurrency;
+const part = Math.ceil(size / count);
+const lines = await Promise.all(Array.from({ length: count }, (_, i) => new Promise(resolve => {
+  const worker = new Worker(new URL('./storage.worker.js', import.meta.url), { type: 'module' });
+  worker.onmessage = ({ data }) => { resolve(data); worker.terminate(); };
+  worker.postMessage({ start: i * part, end: Math.min(size, (i + 1) * part) });
+})));
+console.log(lines.reduce((sum, n) => sum + n, 0), 'lines');
 ```
 
 ## Browser: a folder on disk
@@ -101,13 +110,13 @@ test('appends a record', async () => {
 });
 ```
 
-Memory, native files and OPFS pass the same 33 contract cases, so code tested against memory runs unchanged on disk and in the browser.
+Memory, native files and OPFS pass the same 35 contract cases, so code tested against memory runs unchanged on disk and in the browser.
 
 ## API
 
 Adapters: `createMemoryStorage(options?)`, `createFileStorage(root, options?)`, `createOPFSStorage({ name, ...options })` and `createDirectoryStorage(handle, options?)`. Each has `open(name, options?)`, `list()` and `remove(name)`.
 
-`open` options: `create` (never truncates an existing file), `exclusive` (requires a new file), `readOnly`, `writeBuffer` (bytes to collect before one backend write).
+`open` options: `create` (never truncates an existing file), `exclusive` (requires a new file), `readOnly` (shared with other read-only handles by default, across workers on OPFS, so several workers can scan one file at once; `shared: false` makes a read-only owner), `shared` (without `readOnly`: a shared writer, several of which write one file at explicit offsets, without `append`, where `capabilities.sharedWriters` is true: memory, native files, OPFS in Chromium), `writeBuffer` (bytes to collect before one backend write).
 
 File handle:
 
@@ -126,8 +135,8 @@ Custom backends: `createStorageFile(name, backend, options?)` wraps any byte bac
 
 Each open handle admits work at call time, before copying any input:
 
-- `maxPendingOperations`: queued plus running operations, default 1,024;
-- `maxPendingWriteBytes`: input copies held by queued writes, default 64 MiB;
+- `maxPendingOperations`: queued plus running operations, default 2,048;
+- `maxPendingWriteBytes`: input copies held by queued writes, default 128 MiB;
 - `maxWriteBytes`: one write or append, default 64 MiB;
 - `maxReadBytes`: one read, `readInto` window or stream chunk, default 64 MiB.
 
@@ -149,12 +158,13 @@ try {
 
 ## Measured performance
 
-From one `make bench` run on an Apple M5 Max, recorded November 9, 2026: medians of five runs, warm page cache. The reports are in the repository's `benchmarks/` folder.
+From one `make bench` run on an Apple M5 Max, recorded November 20, 2026: medians of five runs, warm page cache. The reports are in the repository's `benchmarks/` folder.
 
-- OPFS appends in Chromium: 0.63 GiB/s with 4 KiB blocks, 3.89 GiB/s with 64 KiB, 6.02 GiB/s with 1 MiB; streamed reads with 1 MiB chunks: 11.53 GiB/s; a 4 KiB read at a random offset: 0.8 µs on average.
-- `writeBuffer: 1 MiB` made awaited 4 KiB appends 8.7 to 32 times faster in Chromium, Firefox and WebKit.
-- 2,000 appends of 64 KiB fired without await: version 0.2.0 admitted 1,024, refused 976 at once, and its ArrayBuffer memory peaked at 134 MB, where 0.1.0 buffered every call and reached 265 MB.
-- A 512 MiB file written in 1 MiB chunks and streamed back with SHA-256 in a Node.js process with a 32 MiB V8 heap: resident memory peaked at 77 MB.
+- OPFS appends in Chromium: 0.46 GiB/s with 4 KiB blocks, 3.65 GiB/s with 64 KiB, 7.66 GiB/s with 1 MiB; streamed reads with 1 MiB chunks: 6.91 GiB/s; a 4 KiB read at a random offset: 1.4 µs on average.
+- Awaited 4 KiB appends with `writeBuffer: 1 MiB`: 5.90 GiB/s in Chromium, 1.83 GiB/s in Firefox, 6.94 GiB/s in WebKit; without it 570 MiB/s, 60 MiB/s and 980 MiB/s.
+- 4,000 appends of 64 KiB fired without await: version 0.4.0 admitted 2,048, refused 1,952 at once, and its ArrayBuffer memory peaked at 269 MB, where 0.1.0 buffered every call and reached 531 MB.
+- Parallel scans of a 128 MiB OPFS file in 1 MiB chunks through shared read-only handles: in Chromium, eight workers streamed it at 18.94 GiB/s, one owner at 5.19 GiB/s. With a stand-in decoder, eight workers scanned at 2.54 GiB/s (Chromium), 1.44 GiB/s (Firefox) and 790 MiB/s (WebKit), one owner at 469 MiB/s, 441 MiB/s and 202 MiB/s. In Chromium, eight shared writers with a stand-in encoder wrote one file at 1.81 GiB/s, one owner at 468 MiB/s.
+- A 512 MiB file written in 1 MiB chunks and streamed back with SHA-256 in a Node.js process with a 32 MiB V8 heap: resident memory peaked at 117 MB.
 
 ## Good to know
 

@@ -28,7 +28,7 @@ export function engineFor(userAgent: string): Environment['id'] {
 /** The recorded value of one case in `environment`. */
 export function recorded(environment: Environment, id: BenchCase['id']): number | null {
   const option = (key: string) => environment.options[key]?.median ?? null;
-  const row = environment.rows.find(entry => entry.version === '0.2.0' && entry.adapter === 'opfs' && entry.chunk === (id === 'stream64k' ? 65536 : 4096));
+  const row = environment.rows.find(entry => entry.version === environment.version && entry.adapter === 'opfs' && entry.chunk === (id === 'stream64k' ? 65536 : 4096));
   switch (id) {
     case 'append4k': return option('append 4 KiB awaited');
     case 'append4kBuffered': return option('append 4 KiB awaited, writeBuffer 1 MiB');

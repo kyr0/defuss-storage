@@ -1,0 +1,327 @@
+{
+  "date": "2026-11-20T03:26:26.769Z",
+  "cpus": 18,
+  "config": {
+    "reps": 5,
+    "bytes": 134217728,
+    "works": [
+      0,
+      64
+    ],
+    "chunkSizes": [
+      65536,
+      1048576
+    ],
+    "workers": [
+      1,
+      2,
+      4,
+      8
+    ]
+  },
+  "browsers": {
+    "chromium": {
+      "version": "151.0.7922.34",
+      "results": [
+        {
+          "kind": "scan",
+          "work": 0,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "owning x1": 5079,
+            "shared x1": 4476,
+            "shared x2": 7399,
+            "shared x4": 10079,
+            "shared x8": 10240
+          }
+        },
+        {
+          "kind": "scan",
+          "work": 0,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "owning x1": 5311,
+            "shared x1": 4981,
+            "shared x2": 8205,
+            "shared x4": 10407,
+            "shared x8": 19394
+          }
+        },
+        {
+          "kind": "scan",
+          "work": 64,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "owning x1": 454,
+            "shared x1": 453,
+            "shared x2": 920,
+            "shared x4": 1656,
+            "shared x8": 2476
+          }
+        },
+        {
+          "kind": "scan",
+          "work": 64,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "owning x1": 469,
+            "shared x1": 461,
+            "shared x2": 847,
+            "shared x4": 1574,
+            "shared x8": 2596
+          }
+        },
+        {
+          "kind": "write",
+          "work": 0,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "one file x1": 3224,
+            "own files x2": 3914,
+            "own files x4": 4224,
+            "own files x8": 3988,
+            "shared file x2": 3062,
+            "shared file x4": 3077,
+            "shared file x8": 3048
+          }
+        },
+        {
+          "kind": "write",
+          "work": 0,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "one file x1": 5689,
+            "own files x2": 7950,
+            "own files x4": 3626,
+            "own files x8": 3636,
+            "shared file x2": 3678,
+            "shared file x4": 3668,
+            "shared file x8": 4156
+          }
+        },
+        {
+          "kind": "write",
+          "work": 64,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "one file x1": 441,
+            "own files x2": 819,
+            "own files x4": 1283,
+            "own files x8": 2133,
+            "shared file x2": 756,
+            "shared file x4": 1086,
+            "shared file x8": 1637
+          }
+        },
+        {
+          "kind": "write",
+          "work": 64,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "one file x1": 468,
+            "own files x2": 843,
+            "own files x4": 1540,
+            "own files x8": 2462,
+            "shared file x2": 830,
+            "shared file x4": 1421,
+            "shared file x8": 1852
+          }
+        }
+      ]
+    },
+    "firefox": {
+      "version": "153.0",
+      "results": [
+        {
+          "kind": "scan",
+          "work": 0,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "owning x1": 1376,
+            "shared x1": 1542,
+            "shared x2": 547,
+            "shared x4": 723,
+            "shared x8": 934
+          }
+        },
+        {
+          "kind": "scan",
+          "work": 0,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "owning x1": 3368,
+            "shared x1": 3879,
+            "shared x2": 1407,
+            "shared x4": 2032,
+            "shared x8": 1803
+          }
+        },
+        {
+          "kind": "scan",
+          "work": 64,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "owning x1": 221,
+            "shared x1": 215,
+            "shared x2": 280,
+            "shared x4": 472,
+            "shared x8": 727
+          }
+        },
+        {
+          "kind": "scan",
+          "work": 64,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "owning x1": 441,
+            "shared x1": 427,
+            "shared x2": 569,
+            "shared x4": 1000,
+            "shared x8": 1471
+          }
+        },
+        {
+          "kind": "write",
+          "work": 0,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "one file x1": 677,
+            "own files x2": 1058,
+            "own files x4": 1471,
+            "own files x8": 1219
+          }
+        },
+        {
+          "kind": "write",
+          "work": 0,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "one file x1": 2844,
+            "own files x2": 4267,
+            "own files x4": 4741,
+            "own files x8": 2327
+          }
+        },
+        {
+          "kind": "write",
+          "work": 64,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "one file x1": 303,
+            "own files x2": 529,
+            "own files x4": 941,
+            "own files x8": 962
+          }
+        },
+        {
+          "kind": "write",
+          "work": 64,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "one file x1": 490,
+            "own files x2": 776,
+            "own files x4": 1438,
+            "own files x8": 1422
+          }
+        }
+      ]
+    },
+    "webkit": {
+      "version": "26.5",
+      "results": [
+        {
+          "kind": "scan",
+          "work": 0,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "owning x1": 5565,
+            "shared x1": 5818,
+            "shared x2": 370,
+            "shared x4": 352,
+            "shared x8": 332
+          }
+        },
+        {
+          "kind": "scan",
+          "work": 0,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "owning x1": 6737,
+            "shared x1": 7111,
+            "shared x2": 2286,
+            "shared x4": 2560,
+            "shared x8": 2065
+          }
+        },
+        {
+          "kind": "scan",
+          "work": 64,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "owning x1": 198,
+            "shared x1": 196,
+            "shared x2": 174,
+            "shared x4": 196,
+            "shared x8": 185
+          }
+        },
+        {
+          "kind": "scan",
+          "work": 64,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "owning x1": 202,
+            "shared x1": 203,
+            "shared x2": 382,
+            "shared x4": 723,
+            "shared x8": 790
+          }
+        },
+        {
+          "kind": "write",
+          "work": 0,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "one file x1": 4267,
+            "own files x2": 5818,
+            "own files x4": 6737,
+            "own files x8": 5333
+          }
+        },
+        {
+          "kind": "write",
+          "work": 0,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "one file x1": 3368,
+            "own files x2": 2977,
+            "own files x4": 3200,
+            "own files x8": 3200
+          }
+        },
+        {
+          "kind": "write",
+          "work": 64,
+          "chunkSize": 65536,
+          "mibPerSecond": {
+            "one file x1": 677,
+            "own files x2": 396,
+            "own files x4": 749,
+            "own files x8": 1174
+          }
+        },
+        {
+          "kind": "write",
+          "work": 64,
+          "chunkSize": 1048576,
+          "mibPerSecond": {
+            "one file x1": 663,
+            "own files x2": 400,
+            "own files x4": 684,
+            "own files x8": 1153
+          }
+        }
+      ]
+    }
+  }
+}

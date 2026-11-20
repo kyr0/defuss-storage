@@ -15,11 +15,12 @@ const log = await storage.open('events.log', {
   create: true,
   writeBuffer: 1024 * 1024, // batch small appends
 });
+await log.append(new TextEncoder().encode('hello\\n'));
+await log.close();
 
-const bytes = new TextEncoder().encode('hello\\n');
-const { offset } = await log.append(bytes);
-await log.readExactly(offset, bytes.byteLength);
-await log.flush();`),
+// In each of 8 workers: read-only opens are shared
+const part = await storage.open('events.log', { readOnly: true });
+for await (const chunk of part.stream({ start, end })) decode(chunk);`),
 
   'install-bun': shell('bun add defuss-storage'),
   'install-pnpm': shell('pnpm add defuss-storage'),
@@ -53,21 +54,30 @@ const record = await log.readExactly(offset, byteLength);`),
   'use-worker': js(`import { createOPFSStorage } from 'defuss-storage/opfs';
 
 const storage = await createOPFSStorage({ name: 'notes' });
-const file = await storage.open('notes.log', { create: true });
 
-self.onmessage = async ({ data }) => {
-  const bytes = new TextEncoder().encode(data + '\\n');
-  const receipt = await file.append(bytes);
-  await file.flush();
-  self.postMessage(receipt); // { offset, byteLength }
+// Read-only opens are shared: every worker reads notes.log at once.
+self.onmessage = async ({ data: { start, end } }) => {
+  const file = await storage.open('notes.log', { readOnly: true });
+  let lines = 0;
+  try {
+    for await (const chunk of file.stream({ start, end, chunkSize: 1024 * 1024 })) {
+      for (const byte of chunk) if (byte === 10) lines++;
+    }
+  } finally {
+    await file.close();
+  }
+  self.postMessage(lines);
 };`),
-  'use-main': js(`const worker = new Worker(
-  new URL('./storage.worker.js', import.meta.url),
-  { type: 'module' },
-);
-
-worker.onmessage = ({ data }) => console.log('stored at', data.offset);
-worker.postMessage('first note');`),
+  'use-main': js(`// One worker per core, each counting the lines of its byte range.
+const size = 256 * 1024 * 1024; // notes.log's size, e.g. from file.size()
+const count = navigator.hardwareConcurrency;
+const part = Math.ceil(size / count);
+const lines = await Promise.all(Array.from({ length: count }, (_, i) => new Promise(resolve => {
+  const worker = new Worker(new URL('./storage.worker.js', import.meta.url), { type: 'module' });
+  worker.onmessage = ({ data }) => { resolve(data); worker.terminate(); };
+  worker.postMessage({ start: i * part, end: Math.min(size, (i + 1) * part) });
+})));
+console.log(lines.reduce((sum, n) => sum + n, 0), 'lines');`),
   'use-node': js(`import { createReadStream } from 'node:fs';
 import { appendChunks } from 'defuss-storage';
 import { createFileStorage } from 'defuss-storage/node';

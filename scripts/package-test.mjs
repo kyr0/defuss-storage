@@ -77,6 +77,13 @@ while (performance.now() - start < 200) { await busy.write(0, block); calls++; }
 parentPort.postMessage({ busy: 'end', ms: performance.now() - start, calls }); await busy.close();
 parentPort.postMessage({ done: true });
 `);
+  await writeFile(path.join(cwd, 'shared-writer.mjs'), `import { parentPort, workerData } from 'node:worker_threads';
+import { createFileStorage } from 'defuss-storage/node';
+const storage = await createFileStorage(workerData.dir);
+const f = await storage.open('parallel.bin', { create: true, shared: true });
+await f.write(workerData.part * 65536, new Uint8Array(65536).fill(workerData.part + 1)); await f.flush(); await f.close();
+parentPort.postMessage({ done: true });
+`);
   await writeFile(path.join(cwd, 'worker.mjs'), `import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -99,15 +106,27 @@ await new Promise((resolve, reject) => {
 }).finally(() => clearInterval(timer));
 assert.ok(busy.calls > 0 && busy.ticks >= busy.ms / 50, 'main thread kept running: ' + JSON.stringify(busy));
 const storage = await createFileStorage(dir);
-const f = await storage.open('worker.bin');
+// Two read-only handles (shared by default) read the halves at once; an owning open waits for both to close.
+const [f, h] = await Promise.all([0, 1].map(() => storage.open('worker.bin', { readOnly: true })));
+await assert.rejects(storage.open('worker.bin'), { code: 'BUSY' });
 assert.equal(await f.size(), 130048);
-assert.deepEqual([...await f.read(0, 5)], [9, 9, 9, 9, 0]);
-assert.ok((await f.read(4096 * 15, 4096)).every(b => b === 15));
-assert.ok((await f.read(65536, 130048 - 65536)).every(b => b === 0xab));
-await f.close();
+const [head, tail] = await Promise.all([f.read(0, 65536), h.read(65536, 130048 - 65536)]);
+assert.deepEqual([...head.subarray(0, 5)], [9, 9, 9, 9, 0]);
+assert.ok(head.subarray(4096 * 15).every(b => b === 15));
+assert.ok(tail.every(b => b === 0xab));
+await f.close(); await assert.rejects(storage.open('worker.bin'), { code: 'BUSY' }); await h.close();
+await (await storage.open('worker.bin')).close();
 const g = await storage.open('buffered.bin'); const bytes = await g.read(0, 204800);
 assert.equal(bytes.length, 204800); assert.ok(bytes.every((b, i) => b === (Math.floor(i / 1024) & 255)));
-await g.close(); await rm(dir, { recursive: true, force: true });
+await g.close();
+// Two worker threads write the halves of one file through shared writers at once.
+await Promise.all([0, 1].map(part => new Promise((resolve, reject) => {
+  const w = new Worker(new URL('./shared-writer.mjs', import.meta.url), { workerData: { dir, part } });
+  w.once('message', resolve); w.once('error', reject);
+})));
+const p = await storage.open('parallel.bin', { readOnly: true }); const both = await p.read(0, 262144);
+assert.equal(both.length, 131072); assert.ok(both.every((b, i) => b === (i < 65536 ? 1 : 2)));
+await p.close(); await rm(dir, { recursive: true, force: true });
 `);
 }
 
@@ -149,6 +168,8 @@ async function use() {
   const file = await store.open('bytes', { create: true }); await file.read(0, 3, { signal });
   for await (const receipt of appendChunks(file, source(), { signal })) void receipt.offset;
   await file.close();
+  const reader = await store.open('bytes', { readOnly: true, shared: true }); await reader.close();
+  if (store.capabilities.sharedWriters) { const writer = await store.open('bytes', { shared: true }); await writer.write(0, new Uint8Array(1)); await writer.close(); }
 }
 void full;
 void use; void createFileStorage; void createOPFSStorage;

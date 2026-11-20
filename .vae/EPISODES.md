@@ -51,23 +51,7 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-09T09:08:09Z s=3acf4600 FINDING CHANGELOG.md:transfer (stale performance claim) learn=none: the changelog now states the measured copy-cost saving and overlapping end-to-end ranges; no timing threshold was added
 2026-11-09T13:01:38Z s=3acf4600 FINDING site/src/demos/storage.worker.ts:limitsFor learn=none: UI clamp; the e2e covers the default budget only
 2026-11-09T13:01:38Z s=3acf4600 FINDING site/index.html:theme-color, site/src/install.ts:copyButton, site/src/messages.ts learn=none: cosmetic; no deterministic check worth adding
-2026-11-09T17:39:54Z s=3acf4600 FINDING site/src/demos/seek.ts:jump learn=test: demo e2e asserts a seek adds no toast
-2026-11-09T17:39:54Z s=3acf4600 FINDING site/src/router.ts:afterCommit learn=test: the WebKit demo test reaches the benchmark by client navigation from deep in the page
-2026-11-09T17:39:54Z s=3acf4600 FINDING site/test/build.test.ts:renderVariant learn=test: the test checks localization, not copy
-2026-11-09T18:11:07Z s=3acf4600 FAIL tests.e2e.1
-2026-11-09T18:17:00Z s=3acf4600 DONE fp=bdf7966b8a4c cov=99.2% paths=.oxlintrc.json,ARCH.md,CHANGELOG.md,Makefile(+86)
-2026-11-09T18:17:00Z s=3acf4600 FINDING src/directory.ts:exact learn=test: the shared write-buffer contract case runs on the directory adapter in WebKit
-2026-11-09T18:17:00Z s=3acf4600 FINDING src/directory.ts:DirectoryHandle learn=test: site lint type-checks the worker passing a DOM handle
 2026-11-09T18:17:00Z s=3acf4600 FINDING site/index.html:toggle data-t learn=none: visual; markup pattern documented by the fix
-2026-11-09T19:22:02Z s=3acf4600 FAIL tests.unit,tests.e2e.1
-2026-11-09T19:27:30Z s=3acf4600 FAIL tests.e2e.1
-2026-11-09T19:33:50Z s=3acf4600 DONE fp=93efeb10aac6 cov=99.2% paths=.oxlintrc.json,ARCH.md,CHANGELOG.md,Makefile(+86)
-2026-11-09T20:37:10Z s=3acf4600 FAIL tests.e2e.1
-2026-11-09T20:42:30Z s=3acf4600 DONE fp=89325d87fdc2 cov=99.2% paths=.oxlintrc.json,ARCH.md,CHANGELOG.md,Makefile(+84)
-2026-11-09T20:42:30Z s=3acf4600 FINDING site/e2e/site.test.mjs:routing test learn=test: the test now filters the 404 status line as the route test already did; site e2e 23/23 pass
-2026-11-09T20:50:06Z s=3acf4600 FAIL prose
-2026-11-09T20:55:29Z s=3acf4600 FAIL tests.e2e.1
-2026-11-09T20:58:41Z s=3acf4600 DONE fp=9844a30af50c cov=99.2% paths=.oxlintrc.json,ARCH.md,CHANGELOG.md,Makefile(+84)
 2026-11-09T20:58:41Z s=3acf4600 FINDING site/e2e/site.test.mjs:597 demos in firefox learn=none: one load-related timeout; no deterministic defect to encode; .vae/MEMORY.md already says other sessions load the machine
 2026-11-10T02:04:22Z s=3acf4600 FAIL tests.e2e.1
 2026-11-10T02:36:49Z s=3acf4600 DONE fp=201e77786816 cov=99.2% paths=docs/404.html,docs/assets/backend-But3-ao0.js,docs/assets/backend-ChSdQFFH.js,docs/assets/index-B6HYNZ1Y.css(+23)
@@ -106,3 +90,19 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-16T11:47:10Z s=b982f14b FINDING benchmarks/*.json learn=none: report-only figures; a quiet machine is needed to regenerate the reports
 2026-11-16T11:47:10Z s=b982f14b FINDING docs/assets/*.js, docs/*.html learn=none: the site e2e in three browsers passed in the gate's verify step, the limits demo included
 2026-11-16T14:00:31Z s=b982f14b DONE fp=1fd990d5dc2a cov=99.1% paths=ARCH.md,CHANGELOG.md,README.md,VALIDATION.md(+43)
+2026-11-16T14:03:26Z s=b982f14b DONE fp=c1a77897c7b4 cov=99.1% paths=ARCH.md,CHANGELOG.md,README.md,VALIDATION.md(+33)
+2026-11-20T01:01:44Z s=1b2c3d63 DONE fp=349f8e3e4c20 cov=99.1% paths=ARCH.md,CHANGELOG.md,README.md,VALIDATION.md(+44)
+2026-11-20T01:01:44Z s=1b2c3d63 FINDING tests/browser-worker.ts:share (first version) learn=test: the OPFS shared scenario now asserts the read path per engine from one worker
+2026-11-20T01:01:44Z s=1b2c3d63 FINDING scripts/browser-test.mjs:79,105 learn=none: harness reporting; no rule can check message presence in future failures
+2026-11-20T01:01:44Z s=1b2c3d63 FINDING site/src/strings.ts:157-169, site/llms.txt:63,69 learn=none: copy counts; a test would pin page wording
+2026-11-20T01:01:44Z s=1b2c3d63 FINDING scripts/bench-parallel.mjs:log learn=none: report-only script
+2026-11-20T01:01:44Z s=1b2c3d63 FINDING src/opfs.ts:readOnlyHandles learn=test: native-lock task asserts the path per engine
+2026-11-20T03:33:03Z s=1b2c3d63 FAIL tests.e2e.1
+2026-11-20T03:52:18Z s=1b2c3d63 FAIL tests.e2e.1
+2026-11-20T04:02:05Z s=1b2c3d63 DONE fp=6f50a52d3a50 cov=99.1% paths=ARCH.md,CHANGELOG.md,README.md,VALIDATION.md(+79)
+2026-11-20T04:02:05Z s=1b2c3d63 FINDING src/opfs.ts:open flush learn=test: the existing contract case covers it on every adapter
+2026-11-20T04:02:05Z s=1b2c3d63 FINDING src/opfs.ts:heldElsewhere learn=test: cross-worker browser scenario
+2026-11-20T04:02:05Z s=1b2c3d63 FINDING site/e2e/site.test.mjs:charts render learn=test: e2e follows the report version
+2026-11-20T04:02:05Z s=1b2c3d63 FINDING site/src/strings.ts:hero.rotate learn=test: the rotating-headings e2e test catches it
+2026-11-20T04:02:05Z s=1b2c3d63 FINDING site/index.html:#parallel learn=test: the file:// e2e test catches it
+2026-11-20T04:02:05Z s=1b2c3d63 FINDING site/src/chart-options.ts:overloadOption learn=none: visual layout; no mechanical check short of screenshot diffing

@@ -6,9 +6,9 @@
 // VERIFIED: (site e2e) charts render from the reports, follow the controls and
 // update in place on a language switch.
 import data from 'virtual:site-data';
-import type { Environment } from '../build/data.ts';
+import { BASE_VERSION, type Environment } from '../build/data.ts';
 import {
-  chunkLabel, explorerNote, explorerOption, metricValue, optionsOption, overloadOption, rowsFor, sizesOption,
+  chunkLabel, explorerNote, explorerOption, metricValue, optionsOption, overloadOption, parallelOption, rowsFor, sizesOption,
   type Adapter, type Metric,
 } from './chart-options.ts';
 import { currentLocale, formatNumber, onLocaleChange } from './locale.ts';
@@ -103,8 +103,8 @@ function explorerTable(table: HTMLTableElement, environment: Environment, adapte
     element.append(spread);
     return element;
   };
-  // Only the current release, as in the chart notes; the chart keeps 0.1.0 for its comparison.
-  body.replaceChildren(...rowsFor(environment, adapter, '0.2.0').map(row => {
+  // Only the measured release, as in the chart notes; the chart keeps the base release for its comparison.
+  body.replaceChildren(...rowsFor(environment, adapter, environment.version).map(row => {
     const tr = document.createElement('tr');
     tr.className = 'table-row';
     tr.append(cell(chunkLabel(row.chunk), true), ...(['append', 'pipelined', 'stream', 'streamChecksum', 'readInto'] as const).map(metric => figure(row, metric)));
@@ -132,7 +132,7 @@ function initExplorer(root: HTMLElement): void {
     const api = await chartApi();
     const ink = api.color(chartElement, '--foreground');
     const metricName = text({ append: 'metricAppend', pipelined: 'metricPipelined', stream: 'metricStream', streamChecksum: 'metricChecksum', readInto: 'metricReads' }[metric]);
-    const label = text('chartExplorer', { metric: metricName, runtime: environment.runtime, adapter: text({ file: 'adapterFile', memory: 'adapterMemory', opfs: 'adapterOpfs' }[adapter]) });
+    const label = text('chartExplorer', { metric: metricName, runtime: environment.runtime, version: environment.version, base: BASE_VERSION, adapter: text({ file: 'adapterFile', memory: 'adapterMemory', opfs: 'adapterOpfs' }[adapter]) });
     const option = described(explorerOption(environment, adapter, metric, text, ink), label);
     await showChart(chartElement, option, still);
     renderText(note, explorerNote(environment, adapter, metric, marked, formatNumber));
@@ -148,6 +148,8 @@ export function initCharts(): void {
     ['sizes', () => sizesOption(data, text)],
     ['options', () => optionsOption(data, text)],
     ['overload', () => overloadOption(data, text)],
+    ['parallel-read', () => parallelOption(data, text, 'read')],
+    ['parallel-scan', () => parallelOption(data, text, 'scan')],
   ];
   for (const [id, build] of simple)
     for (const element of document.querySelectorAll<HTMLElement>(`[data-chart-id="${id}"]`)) whenNear(element, still => showChart(element, described(build(), labelOf(element)), still));

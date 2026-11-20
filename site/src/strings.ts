@@ -60,6 +60,7 @@ export const strings: Strings = {
   'anchor.run': t('Link to section: Run it here', 'Link zum Abschnitt: Hier ausführen'),
   'anchor.options': t('Link to section: Options', 'Link zum Abschnitt: Optionen'),
   'anchor.overload': t('Link to section: Overload', 'Link zum Abschnitt: Überlast'),
+  'anchor.parallel': t('Link to section: Many workers, one file', 'Link zum Abschnitt: Viele Worker, eine Datei'),
   'anchor.large': t('Link to section: Large files', 'Link zum Abschnitt: Große Dateien'),
   'anchor.method': t('Link to section: Benchmark method', 'Link zum Abschnitt: Benchmark-Methode'),
 
@@ -69,17 +70,17 @@ export const strings: Strings = {
     '<em>Große Dateien</em> <i>schnell</i> schreiben, lesen und streamen'),
   'hero.flipLead': t('One API to', 'Eine API zum'),
   'hero.rotate': t(
-    '<span><span>process data beyond memory limits</span><span>stream logs</span><span>seek in binary data</span><span>decode while streaming</span><span>sync database tables</span></span>',
-    '<span><span>Verarbeiten von Daten über Speichergrenzen hinaus</span><span>Streamen von Logs</span><span>Springen in Binärdaten</span><span>Dekodieren im Stream</span><span>Synchronisieren von Datenbanktabellen</span></span>'),
+    '<span><span>process data beyond memory limits</span><span>stream logs</span><span>seek in binary data</span><span>scan one file on every core</span><span>sync database tables</span></span>',
+    '<span><span>Verarbeiten von Daten über Speichergrenzen hinaus</span><span>Streamen von Logs</span><span>Springen in Binärdaten</span><span>Durchsuchen einer Datei auf jedem Kern</span><span>Synchronisieren von Datenbanktabellen</span></span>'),
   'hero.desc': t(
-    'Write and stream gigabytes per second and read any offset in microseconds: in the browser, Node.js and Bun, on the native file system, OPFS or in memory. A high-performance binary file I/O stream layer under databases, virtual file systems and caches.',
-    'Gigabytes pro Sekunde schreiben und streamen, jeden Offset in Mikrosekunden lesen: im Browser, unter Node.js und Bun, auf dem nativen Dateisystem, in OPFS oder im Speicher. Eine Hochleistungsschicht für binäre Datei-I/O-Streams unter Datenbanken, virtuellen Dateisystemen und Caches.'),
+    'Write and stream gigabytes per second and read any offset in microseconds: in the browser, Node.js and Bun, on the native file system, OPFS or in memory. Work on one file spreads across workers: read-only opens are shared, so each core reads and decodes its own byte range, and shared writers fill one file at explicit offsets on native files and in Chromium. A high-performance binary file I/O stream layer under databases, virtual file systems and caches.',
+    'Gigabytes pro Sekunde schreiben und streamen, jeden Offset in Mikrosekunden lesen: im Browser, unter Node.js und Bun, auf dem nativen Dateisystem, in OPFS oder im Speicher. Arbeit an einer Datei verteilt sich auf Worker: Lesende Öffnungen sind geteilt, sodass jeder Kern seinen eigenen Bytebereich liest und dekodiert, und geteilte Schreiber füllen eine Datei an expliziten Offsets, auf nativen Dateien und in Chromium. Eine Hochleistungsschicht für binäre Datei-I/O-Streams unter Datenbanken, virtuellen Dateisystemen und Caches.'),
   'hero.chipLabel': t(
     'Measured on OPFS in Chromium, 1 MiB blocks',
     'Gemessen auf OPFS in Chromium, 1-MiB-Blöcke'),
   'hero.chip': t(
-    '<span><span>Write: {{chip1m}}</span><span>Streamed read: {{chipStream1m}}</span><span>Seek and read 4 KiB: {{chipSeek}}</span></span>',
-    '<span><span>Schreiben: {{chip1m}}</span><span>Gestreamt lesen: {{chipStream1m}}</span><span>Springen und 4 KiB lesen: {{chipSeek}}</span></span>'),
+    '<span><span>Write: {{chip1m}}</span><span>Streamed read: {{chipStream1m}}</span><span>Seek and read 4 KiB: {{chipSeek}}</span><span>8 workers stream one file: {{parReadChromium8}}</span><span>8 workers decode one file: {{parScanChromium8}}</span><span>8 workers encode into one file: {{parWriteChromium8}}</span></span>',
+    '<span><span>Schreiben: {{chip1m}}</span><span>Gestreamt lesen: {{chipStream1m}}</span><span>Springen und 4 KiB lesen: {{chipSeek}}</span><span>8 Worker streamen eine Datei: {{parReadChromium8}}</span><span>8 Worker dekodieren eine Datei: {{parScanChromium8}}</span><span>8 Worker kodieren in eine Datei: {{parWriteChromium8}}</span></span>'),
   'anchor.layer': t(
     'Link to section: Where it sits',
     'Link zum Abschnitt: Wo es sitzt'),
@@ -126,14 +127,14 @@ export const strings: Strings = {
     'disk',
     'Festplatte'),
   'quality.nodeRing': t(
-    '148 of 148 tests pass',
-    '148 von 148 Tests bestehen'),
+    '161 of 161 tests pass',
+    '161 von 161 Tests bestehen'),
   'quality.browsersRing': t(
-    '216 of 216 browser tests pass',
-    '216 von 216 Browser-Tests bestehen'),
+    '357 of 357 browser tests pass',
+    '357 von 357 Browser-Tests bestehen'),
   'quality.coverageRing': t(
-    '99.15 percent line coverage',
-    '99,15 Prozent Zeilenabdeckung'),
+    '99.12 percent line coverage',
+    '99,12 Prozent Zeilenabdeckung'),
   'quality.depsRing': t(
     'No runtime dependencies',
     'Keine Laufzeitabhängigkeiten'),
@@ -154,20 +155,20 @@ export const strings: Strings = {
     'OPFS speichert Bytes pro Origin auf der Festplatte. Der Adapter nutzt die synchronen Zugriffs-Handles von Dedicated Workers, in Chromium, Firefox und WebKit.'),
   'why.contract.title': t('One contract, three backends', 'Ein Vertrag, drei Backends'),
   'why.contract.text': t(
-    'Memory, native files and OPFS pass the same 33 contract cases: code tested against memory runs unchanged on disk.',
-    'Speicher, native Dateien und OPFS bestehen dieselben 33 Vertragsfälle: Gegen den Speicher getesteter Code läuft unverändert auf der Festplatte.'),
+    'Memory, native files and OPFS pass the same 35 contract cases: code tested against memory runs unchanged on disk.',
+    'Speicher, native Dateien und OPFS bestehen dieselben 35 Vertragsfälle: Gegen den Speicher getesteter Code läuft unverändert auf der Festplatte.'),
   'why.fast.title': t('Small writes made cheap', 'Kleine Schreibvorgänge, günstig gemacht'),
   'why.fast.text': t(
-    'An opt-in write buffer batches small appends: awaited 4 KiB appends ran {{wbMin}} to {{wbMax}} times faster in Chromium, Firefox and WebKit.',
-    'Ein optionaler Schreibpuffer bündelt kleine Anhänge: Abgewartete 4-KiB-Anhänge liefen in Chromium, Firefox und WebKit {{wbMin}}- bis {{wbMax}}-mal schneller.'),
+    'An opt-in write buffer batches small appends: awaited 4 KiB appends reached {{wbOnChromium}} in Chromium, {{wbOnFirefox}} in Firefox and {{wbOnWebkit}} in WebKit with it, against {{wbOffChromium}}, {{wbOffFirefox}} and {{wbOffWebkit}} without.',
+    'Ein optionaler Schreibpuffer bündelt kleine Anhänge: Abgewartete 4-KiB-Anhänge erreichten damit {{wbOnChromium}} in Chromium, {{wbOnFirefox}} in Firefox und {{wbOnWebkit}} in WebKit, ohne ihn {{wbOffChromium}}, {{wbOffFirefox}} und {{wbOffWebkit}}.'),
   'why.bounded.title': t('Overload is refused, not buffered', 'Überlast wird abgelehnt, nicht gepuffert'),
   'why.bounded.text': t(
     'A call beyond an open file\'s limits fails at once with <code>QUEUE_FULL</code>, before anything is copied. In our overload test, peak memory fell from {{peakOld}} without these limits to {{peakNew}} with them.',
     'Ein Aufruf über die Limits einer geöffneten Datei scheitert sofort mit <code>QUEUE_FULL</code>, bevor etwas kopiert wird. Im Überlasttest sank der Spitzenspeicher von {{peakOld}} ohne diese Limits auf {{peakNew}} mit ihnen.'),
   'why.owner.title': t('One owner per file', 'Ein Besitzer pro Datei'),
   'why.owner.text': t(
-    'Web Locks give each file one owner across workers and tabs. A second opener gets <code>BUSY</code> until the owner closes or its worker ends.',
-    'Web Locks geben jeder Datei einen Besitzer über Worker und Tabs hinweg. Ein zweiter Öffner bekommt <code>BUSY</code>, bis der Besitzer schließt oder sein Worker endet.'),
+    'Web Locks give each file one owner across workers and tabs. A second opener gets <code>BUSY</code> until the owner closes or its worker ends. Read-only opens are shared instead, so many workers can scan one file at once.',
+    'Web Locks geben jeder Datei einen Besitzer über Worker und Tabs hinweg. Ein zweiter Öffner bekommt <code>BUSY</code>, bis der Besitzer schließt oder sein Worker endet. Lesende Öffnungen sind dagegen geteilt, sodass viele Worker eine Datei gleichzeitig durchsuchen.'),
   'why.small.title': t('Small and dependency-free', 'Klein und ohne Abhängigkeiten'),
   'why.small.text': t(
     '{{opfsGzip}} gzipped for the OPFS entry, no runtime dependencies. ESM, CommonJS and TypeScript types included.',
@@ -341,8 +342,8 @@ export const strings: Strings = {
   'perf.eyebrow': t('Performance', 'Performance'),
   'perf.title': t('Measured, with the spread', 'Gemessen, mit der Streuung'),
   'perf.desc': t(
-    'Medians of five runs on an {{cpu}}; thin lines mark the slowest and fastest run. Pick a runtime and an operation; the table lists every figure of the current release.',
-    'Mediane aus fünf Läufen auf einem {{cpu}}; dünne Linien markieren den langsamsten und schnellsten Lauf. Wählen Sie Laufzeit und Operation; die Tabelle listet alle Werte der aktuellen Version.'),
+    'Medians of five runs on an {{cpu}}; thin lines mark the slowest and fastest run. Pick a runtime and an operation; the table lists every figure of the current release. Each figure is one file handle in one worker; for many workers on one file, see <a href="#parallel">Many workers, one file</a>.',
+    'Mediane aus fünf Läufen auf einem {{cpu}}; dünne Linien markieren den langsamsten und schnellsten Lauf. Wählen Sie Laufzeit und Operation; die Tabelle listet alle Werte der aktuellen Version. Jeder Wert gilt für ein Datei-Handle in einem Worker; für viele Worker auf einer Datei siehe <a href="#parallel">Viele Worker, eine Datei</a>.'),
   'perf.runYours': t('Run it in your browser', 'In Ihrem Browser ausführen'),
 
   // Chart controls
@@ -381,8 +382,8 @@ export const strings: Strings = {
     'tests pass on Node.js 20, 24, 26 and Bun',
     'Tests bestehen unter Node.js 20, 24, 26 und Bun'),
   'quality.browsers': t(
-    'browser tests pass: 72 each in Chromium, Firefox and WebKit',
-    'Browser-Tests bestehen: je 72 in Chromium, Firefox und WebKit'),
+    'browser tests pass: 119 each in Chromium, Firefox and WebKit',
+    'Browser-Tests bestehen: je 119 in Chromium, Firefox und WebKit'),
   'quality.coverage': t(
     'line coverage of the built modules (99.15%)',
     'Zeilenabdeckung der gebauten Module (99,15 %)'),
@@ -409,8 +410,8 @@ export const strings: Strings = {
   'install.tab.memory': t('Tests', 'Tests'),
   'install.tab.agent': t('Coding agent', 'Coding-Agent'),
   'install.browserText': t(
-    'Run storage in a dedicated module worker. Vite, webpack and esbuild bundle it from this <code>new URL()</code> form.',
-    'Betreiben Sie den Speicher in einem Dedicated Module Worker. Vite, webpack und esbuild bündeln ihn aus dieser <code>new URL()</code>-Form.'),
+    'Run storage in dedicated module workers. Read-only opens are shared, so one worker per core can scan one file, each its own byte range. Vite, webpack and esbuild bundle the worker from this <code>new URL()</code> form.',
+    'Betreiben Sie den Speicher in Dedicated Module Workers. Lesende Öffnungen sind geteilt, sodass ein Worker pro Kern eine Datei durchsuchen kann, jeder seinen eigenen Bytebereich. Vite, webpack und esbuild bündeln den Worker aus dieser <code>new URL()</code>-Form.'),
   'install.nodeText': t(
     'The same calls on native files. <code>appendChunks</code> copies a stream of any size with flat memory.',
     'Dieselben Aufrufe auf nativen Dateien. <code>appendChunks</code> kopiert einen Stream beliebiger Größe bei flachem Speicherverbrauch.'),
@@ -434,7 +435,7 @@ export const strings: Strings = {
     `Adapter erzeugen Handles; Handles erledigen das I/O. Die ${github('README.md#api-and-invariants', 'README')} beschreibt jede Invariante vollständig.`),
   'api.colCall': t('Call', 'Aufruf'),
   'api.colWhat': t('What it guarantees', 'Was er garantiert'),
-  'api.open': t('Fails on a missing file unless <code>create: true</code>; never truncates an existing one. Options: <code>readOnly</code>, <code>exclusive</code>, <code>writeBuffer</code>.', 'Scheitert an einer fehlenden Datei, außer mit <code>create: true</code>; kürzt nie eine vorhandene. Optionen: <code>readOnly</code>, <code>exclusive</code>, <code>writeBuffer</code>.'),
+  'api.open': t('Fails on a missing file unless <code>create: true</code>; never truncates an existing one. Options: <code>readOnly</code> (shared by default), <code>shared</code>, <code>exclusive</code>, <code>writeBuffer</code>.', 'Scheitert an einer fehlenden Datei, außer mit <code>create: true</code>; kürzt nie eine vorhandene. Optionen: <code>readOnly</code> (standardmäßig geteilt), <code>shared</code>, <code>exclusive</code>, <code>writeBuffer</code>.'),
   'api.append': t('Picks the end of file and writes in one queued step; resolves with <code>{ offset, byteLength }</code>.', 'Wählt das Dateiende und schreibt in einem eingereihten Schritt; liefert <code>{ offset, byteLength }</code>.'),
   'api.write': t('Copies the input at call time, or takes it with <code>{ transfer: true }</code>. Extending a file fills the gap with zeros.', 'Kopiert die Eingabe beim Aufruf oder übernimmt sie mit <code>{ transfer: true }</code>. Beim Verlängern wird die Lücke mit Nullen gefüllt.'),
   'api.readExactly': t('The full range, or <code>UNEXPECTED_EOF</code>. Never a short read in disguise.', 'Den ganzen Bereich oder <code>UNEXPECTED_EOF</code>. Nie ein verkapptes kurzes Lesen.'),
@@ -473,15 +474,33 @@ export const strings: Strings = {
     'Anhänge-Durchsatz pro Option und Laufzeit. In OPFS hilft der Schreibpuffer am meisten; <code>inFlight</code> hilft nativen Dateien.'),
   'options.label': t('Grouped bar chart of append throughput per option and runtime', 'Gruppiertes Balkendiagramm des Anhänge-Durchsatzes pro Option und Laufzeit'),
   'options.source': t('MiB/s, median of five runs. Node.js and Bun write native files; the browsers write OPFS.', 'MiB/s, Median aus fünf Läufen. Node.js und Bun schreiben native Dateien; die Browser schreiben OPFS.'),
+  'parallel.title': t('Many workers, one file', 'Viele Worker, eine Datei'),
+  'parallel.desc': t(
+    'One worker reads and decodes on one core. Read-only opens are shared, so a scan can split a file into byte ranges and give each core its own: any number of workers open the file at once, while writers and removals wait. In Chromium, eight workers streamed a {{parDataset}} file at {{parReadChromium8}}, one owner at {{parReadChromium1}}. Firefox and WebKit allow one sync handle per file, so their other readers read snapshots, and parallel scans pay off where decoding bounds them: with a stand-in decoder, eight workers scanned at {{parScanChromium8}} in Chromium, {{parScanFirefox8}} in Firefox and {{parScanWebkit8}} in WebKit, one owner at {{parScanChromium1}}, {{parScanFirefox1}} and {{parScanWebkit1}}.',
+    'Ein Worker liest und dekodiert auf einem Kern. Lesende Öffnungen sind geteilt, sodass ein Durchlauf eine Datei in Bytebereiche teilen und jedem Kern seinen eigenen geben kann: Beliebig viele Worker öffnen die Datei gleichzeitig, während Schreiber und das Löschen warten. In Chromium streamten acht Worker eine Datei mit {{parDataset}} mit {{parReadChromium8}}, ein Besitzer mit {{parReadChromium1}}. Firefox und WebKit erlauben ein Sync-Handle pro Datei, ihre weiteren Leser lesen daher Snapshots, und parallele Durchläufe lohnen sich dort, wo das Dekodieren sie begrenzt: Mit einem Ersatz-Decoder erreichten acht Worker {{parScanChromium8}} in Chromium, {{parScanFirefox8}} in Firefox und {{parScanWebkit8}} in WebKit, ein Besitzer {{parScanChromium1}}, {{parScanFirefox1}} und {{parScanWebkit1}}.'),
+  'parallel.write': t(
+    'Shared writers (<code>shared: true</code>) write one file together at explicit offsets. With a stand-in encoder in Chromium, eight of them wrote at {{parWriteChromium8}}, one owner at {{parWriteChromium1}}, and eight workers with a file each at {{parOwnWriteChromium8}}. Firefox and WebKit allow one writer per file, so there each worker writes a file of its own.',
+    'Geteilte Schreiber (<code>shared: true</code>) schreiben gemeinsam an expliziten Offsets in eine Datei. Mit einem Ersatz-Encoder in Chromium schrieben acht von ihnen mit {{parWriteChromium8}}, ein Besitzer mit {{parWriteChromium1}} und acht Worker mit je einer eigenen Datei mit {{parOwnWriteChromium8}}. Firefox und WebKit erlauben einen Schreiber pro Datei, dort schreibt also jeder Worker eine eigene Datei.'),
+  'parallel.readTitle': t('Streaming only', 'Nur streamen'),
+  'parallel.scanTitle': t('With a stand-in decoder', 'Mit einem Ersatz-Decoder'),
+  'parallel.readLabel': t(
+    'Bar chart: MiB/s of whole scans without decoding, with 1, 4 and 8 workers in Chromium, Firefox and WebKit',
+    'Balkendiagramm: MiB/s ganzer Durchläufe ohne Dekodieren, mit 1, 4 und 8 Workern in Chromium, Firefox und WebKit'),
+  'parallel.scanLabel': t(
+    'Bar chart: MiB/s of whole scans with a stand-in decoder, with 1, 4 and 8 workers in Chromium, Firefox and WebKit',
+    'Balkendiagramm: MiB/s ganzer Durchläufe mit einem Ersatz-Decoder, mit 1, 4 und 8 Workern in Chromium, Firefox und WebKit'),
+  'parallel.source': t(
+    'From <code>bun run bench:parallel</code>: OPFS, 1 MiB chunks, medians of {{parRuns}} runs, opens and closes included. The stand-in decoder works at a few hundred MiB/s per core.',
+    'Aus <code>bun run bench:parallel</code>: OPFS, 1-MiB-Chunks, Mediane aus {{parRuns}} Läufen, Öffnen und Schließen eingerechnet. Der Ersatz-Decoder arbeitet mit einigen hundert MiB/s pro Kern.'),
   'overload.title': t('Overload, measured', 'Überlast, gemessen'),
   'overload.desc': t(
-    '{{overloadCalls}} appends of {{overloadChunk}} fired without await into the memory adapter on Node.js. 0.2.0 admitted {{overloadAccepted}} and refused {{overloadRejected}} at once; its ArrayBuffer memory peaked at {{peakNew}}, where 0.1.0 buffered every call and reached {{peakOld}}.',
-    '{{overloadCalls}} Anhänge zu je {{overloadChunk}}, ohne await in den Speicher-Adapter unter Node.js gesendet. 0.2.0 nahm {{overloadAccepted}} an und lehnte {{overloadRejected}} sofort ab; sein ArrayBuffer-Speicher lag höchstens bei {{peakNew}}, während 0.1.0 jeden Aufruf pufferte und {{peakOld}} erreichte.'),
-  'overload.label': t('Bar chart: accepted and rejected calls and peak memory, 0.1.0 and 0.2.0', 'Balkendiagramm: angenommene und abgelehnte Aufrufe und Spitzenspeicher, 0.1.0 und 0.2.0'),
+    '{{overloadCalls}} appends of {{overloadChunk}} fired without await into the memory adapter on Node.js. {{benchVersion}} admitted {{overloadAccepted}}, its default budget of 2,048 operations and 128 MiB, and refused {{overloadRejected}} at once; its ArrayBuffer memory peaked at {{peakNew}}, where {{baseVersion}} buffered every call and reached {{peakOld}}.',
+    '{{overloadCalls}} Anhänge zu je {{overloadChunk}}, ohne await in den Speicher-Adapter unter Node.js gesendet. {{benchVersion}} nahm {{overloadAccepted}} an, sein Standardbudget von 2.048 Operationen und 128 MiB, und lehnte {{overloadRejected}} sofort ab; sein ArrayBuffer-Speicher lag höchstens bei {{peakNew}}, während {{baseVersion}} jeden Aufruf pufferte und {{peakOld}} erreichte.'),
+  'overload.label': t('Bar chart: accepted and rejected calls and peak memory, {{baseVersion}} and {{benchVersion}}', 'Balkendiagramm: angenommene und abgelehnte Aufrufe und Spitzenspeicher, {{baseVersion}} und {{benchVersion}}'),
   'large.title': t('Too big for the heap? No problem.', 'Zu groß für den Heap? Kein Problem.'),
   'large.desc': t(
-    'Memory follows the chunk size, not the file size. Each handle admits a bounded amount of pending write data (64 MiB by default) and rejects the excess with <code>QUEUE_FULL</code> instead of buffering it, and <code>appendChunks</code> keeps one pull and one append outstanding. Reading back, a stream holds one chunk, plus at most one read ahead while your code works on the last. Files many times the size of the JavaScript heap pass through with flat memory.',
-    'Der Speicher richtet sich nach der Chunk-Größe, nicht nach der Dateigröße. Jedes Handle nimmt nur eine begrenzte Menge ausstehender Schreibdaten an (standardmäßig 64 MiB) und lehnt den Rest mit <code>QUEUE_FULL</code> ab, statt ihn zu puffern, und <code>appendChunks</code> hält je einen Pull und ein Append offen. Beim Zurücklesen hält ein Stream einen Chunk, plus höchstens einen vorausgelesenen, während Ihr Code den letzten verarbeitet. Dateien, die ein Vielfaches des JavaScript-Heaps groß sind, laufen mit flachem Speicherverbrauch durch.'),
+    'Memory follows the chunk size, not the file size. Each handle admits a bounded amount of pending write data (128 MiB by default) and rejects the excess with <code>QUEUE_FULL</code> instead of buffering it, and <code>appendChunks</code> keeps one pull and one append outstanding. Reading back, a stream holds one chunk, plus at most one read ahead while your code works on the last. Files many times the size of the JavaScript heap pass through with flat memory.',
+    'Der Speicher richtet sich nach der Chunk-Größe, nicht nach der Dateigröße. Jedes Handle nimmt nur eine begrenzte Menge ausstehender Schreibdaten an (standardmäßig 128 MiB) und lehnt den Rest mit <code>QUEUE_FULL</code> ab, statt ihn zu puffern, und <code>appendChunks</code> hält je einen Pull und ein Append offen. Beim Zurücklesen hält ein Stream einen Chunk, plus höchstens einen vorausgelesenen, während Ihr Code den letzten verarbeitet. Dateien, die ein Vielfaches des JavaScript-Heaps groß sind, laufen mit flachem Speicherverbrauch durch.'),
   'large.file': t('file written and streamed back', 'Datei geschrieben und zurückgestreamt'),
   'large.heap': t('V8 heap limit of the process', 'V8-Heap-Limit des Prozesses'),
   'large.rss': t('peak resident memory', 'höchster residenter Speicher'),

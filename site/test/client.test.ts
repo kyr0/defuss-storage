@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { siteData } from '../build/data.ts';
-import { explorerNote, explorerOption, optionsOption, rowsFor } from '../src/chart-options.ts';
+import { explorerNote, explorerOption, optionsOption, parallelOption, rowsFor } from '../src/chart-options.ts';
 import { rewriteImports } from '../src/demos/imports.ts';
 import { hexRows } from '../src/hex.ts';
 import { message } from '../src/messages.ts';
@@ -33,13 +33,20 @@ test('rewriteImports maps package imports to bundled modules and rejects others'
 
 test('explorer options and notes follow the recorded reports', () => {
   const node = data.environments.find(environment => environment.id === 'node')!;
-  assert.equal(rowsFor(node, 'file', '0.2.0').length, 3);
+  const version = node.version;
+  assert.equal(version, data.benchVersion);
+  assert.equal(rowsFor(node, 'file', version).length, 3);
   const option = explorerOption(node, 'file', 'pipelined', text, '#000') as { series: { id: string; data: unknown[] }[] };
-  assert.deepEqual(option.series.map(series => series.id), ['v0.1.0', 'v0.1.0-range', 'v0.2.0', 'v0.2.0-range']);
-  const current = rowsFor(node, 'file', '0.2.0')[0]!.pipelined.median;
+  assert.deepEqual(option.series.map(series => series.id), ['v0.1.0', 'v0.1.0-range', `v${version}`, `v${version}-range`]);
+  const current = rowsFor(node, 'file', version)[0]!.pipelined.median;
   assert.equal(option.series[2]!.data[0], Number(current.toFixed(1)));
-  assert.match(explorerNote(node, 'file', 'pipelined', text, format), /^At (4 KiB|64 KiB|1 MiB), 0\.2\.0 reaches/);
+  assert.match(explorerNote(node, 'file', 'pipelined', text, format), new RegExp(`^At (4 KiB|64 KiB|1 MiB), ${version.replaceAll('.', '\\.')} reaches`));
   assert.match(explorerNote(node, 'file', 'readInto', text, format), /Lower is better/);
+  for (const workload of ['read', 'scan'] as const) {
+    const parallel = parallelOption(data, text, workload) as { series: { id: string; data: (number | null)[] }[] };
+    assert.deepEqual(parallel.series.map(series => series.id), ['owning x1', 'shared x4', 'shared x8']);
+    assert.deepEqual(parallel.series[2]!.data, data.parallel.browsers.map(browser => browser[workload]['shared x8']));
+  }
   const options = optionsOption(data, text) as { series: { data: (number | null)[] }[] };
   assert.equal(options.series.length, 5);
   // Browsers have no synchronous I/O option: their bar is empty, not zero.

@@ -56,8 +56,28 @@ export interface OpenOptions {
   create?: boolean;
   /** Require a new file. Requires create:true. */
   exclusive?: boolean;
-  /** Requires an existing file; still acquires exclusive handle ownership. */
+  /** Requires an existing file. Shared with other read-only handles unless `shared` is false. */
   readOnly?: boolean;
+  /**
+   * Share the file with other handles of the same kind instead of owning it.
+   * Default: `readOnly`, so read-only opens are shared and writable opens own
+   * the file. Shared readers, shared writers and an owner exclude one another:
+   * an open of one kind rejects BUSY while a handle of another kind is open, and
+   * a removal rejects BUSY while any handle is. Any number of handles of one
+   * shared kind may be open at once, within the adapter's ownership scope (see
+   * {@link StorageCapabilities.ownership}): on OPFS and directory handles that
+   * includes other workers and tabs.
+   *
+   * Shared readers (`readOnly: true`): for parallel scans, each worker opens the
+   * file and reads its own byte range. `shared: false` makes a read-only owner.
+   *
+   * Shared writers (`readOnly` false): every handle writes at explicit offsets,
+   * and the caller keeps their byte ranges apart. `append` rejects UNSUPPORTED,
+   * since other writers move the end of the file; `size()` and `read` ask the
+   * file each time instead of tracking its size; `writeBuffer` is not allowed.
+   * Adapters without {@link StorageCapabilities.sharedWriters} reject UNSUPPORTED.
+   */
+  shared?: boolean;
   /**
    * Bytes of appends to collect before one backend write; default 0 (off).
    * Appends up to this size resolve once copied into the buffer, which is
@@ -65,7 +85,7 @@ export interface OpenOptions {
    * Until then the bytes are invisible to other processes and lost on a crash,
    * and a failed buffer write rejects the later operation that needed it. One
    * allocation of this size per handle, outside the admission budget. Not
-   * allowed with readOnly.
+   * allowed with readOnly or a shared writer.
    */
   writeBuffer?: number;
 }
@@ -86,9 +106,9 @@ export interface OpenOptions {
 export interface AdmissionOptions {
   /** Largest single write/append input; default 64 MiB. A larger input throws RangeError. */
   maxWriteBytes?: number;
-  /** Bytes of write/append input copies a handle may hold queued or in flight; default 64 MiB. */
+  /** Bytes of write/append input copies a handle may hold queued or in flight; default 128 MiB. */
   maxPendingWriteBytes?: number;
-  /** Queued plus running operations per handle; default 1,024. close() is always admitted. */
+  /** Queued plus running operations per handle; default 2,048. close() is always admitted. */
   maxPendingOperations?: number;
 }
 
@@ -114,13 +134,20 @@ export interface StorageCapabilities {
   readonly snapshots: false;
   /** Always false in v0.1: no atomic rename or replace. */
   readonly atomicReplace: false;
+  /**
+   * Several handles can write one file at once (see {@link OpenOptions.shared}).
+   * Memory and native files: true. OPFS: where the browser has
+   * `readwrite-unsafe` sync access handles (Chromium). Directory handles: false.
+   * Absent (adapters written against 0.3) means false.
+   */
+  readonly sharedWriters?: boolean;
 }
 
 /** Where {@link StorageFile.append} placed its bytes. */
 export interface AppendResult { offset: number; byteLength: number }
 
 /**
- * An open, exclusively owned byte file.
+ * An open byte file: owned by this handle, or shared (see {@link OpenOptions.shared}).
  *
  * Every operation is queued on the handle and takes effect in invocation order,
  * so `append` can choose EOF and write without racing other calls on the same
@@ -140,7 +167,8 @@ export interface StorageFile {
   /**
    * Current byte size, ordered after all previously queued operations. Tracked
    * by the handle after one backend query; re-queried after a failed mutation
-   * or a short read. Writers outside the ownership contract are not observed.
+   * or a short read. A shared writer asks the file every time, so it sees the
+   * other writers' extensions. Writers outside the ownership contract are not observed.
    */
   size(): Promise<number>;
   /** Returns up to length bytes; EOF is an empty array. Output is owned by caller. */
@@ -159,7 +187,7 @@ export interface StorageFile {
   /**
    * Serializes EOF selection and write against other operations on this handle.
    * Appends queued together may share one backend write; each still resolves
-   * only once all its own bytes are written.
+   * only once all its own bytes are written. Rejects UNSUPPORTED on a shared writer.
    */
   append(data: Uint8Array, options?: WriteOptions): Promise<AppendResult>;
   /** Shrinks or zero-extends to `size`; discarded bytes never reappear on regrowth. */
@@ -190,10 +218,10 @@ export interface StorageFile {
 /** A flat namespace of byte files with one owner per name. */
 export interface StorageAdapter {
   readonly capabilities: StorageCapabilities;
-  /** Opens `name` with exclusive ownership; rejects BUSY while another handle owns it. */
+  /** Opens `name` as its owner, or shared with other handles of its kind (see {@link OpenOptions.shared}); rejects BUSY on a conflict. */
   open(name: string, options?: OpenOptions): Promise<StorageFile>;
   /** Sorted flat names. No recursion; no snapshot under concurrent mutations. */
   list(): Promise<string[]>;
-  /** False if absent; BUSY if an owned handle is open. */
+  /** False if absent; BUSY if any handle of it is open. */
   remove(name: string): Promise<boolean>;
 }

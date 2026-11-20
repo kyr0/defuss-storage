@@ -116,6 +116,9 @@ Native ownership is **cooperative within one JavaScript realm**, including
 independent adapter instances and both ESM/CommonJS builds. It is not an OS-level
 file lock. Use one owner service/worker for a root; multiple processes or Node
 worker threads writing that root concurrently are outside the v0.1 contract.
+Each worker thread is a realm of its own, so readers or writers in several workers
+can open one file at once; within a realm, read-only opens are shared by default
+and several writers need shared writers (see Parallel reads and writes).
 
 ## Browser OPFS
 
@@ -137,8 +140,8 @@ try {
 The adapter uses `navigator.storage.getDirectory()`, a namespace directory under
 `defuss-storage`, `FileSystemSyncAccessHandle`, and Web Locks. The same origin and
 namespace share bytes. Web Locks coordinate this package's opens/removes across
-workers and tabs; the native sync handle additionally owns its file. Even a
-read-only open has exclusive ownership. A terminated worker releases its browser
+workers and tabs; the native sync handle additionally owns its file. A
+read-only open is shared by default; `shared: false` makes it an owner (see Parallel reads and writes). A terminated worker releases its browser
 locks, and a new worker can then open the file; partially written
 bytes may remain. OPFS persistence remains subject to browser quota, eviction and
 user clearing. The package does not request persistent-storage permission or
@@ -180,14 +183,98 @@ writes, OPFS sync handles write in place.
 
 Ownership uses Web Locks named after the adapter's `name`, by default the
 folder's name: adapters with the same name exclude each other's opens across
-workers and tabs. Give two different folders with the same name different
+workers and tabs, and shared handles take the lock in shared mode. Give two different folders with the same name different
 names. Without read-write permission, writes reject `PERMISSION_DENIED`.
 
-VERIFIED (Chromium 151, Firefox 153, WebKit 26.5, Playwright 1.62.1): the 33
+VERIFIED (Chromium 151, Firefox 153, WebKit 26.5, Playwright 1.62.1): the 34
 contract cases and DSON integration pass on OPFS directory handles, two workers
 get `BUSY` for one file, and the adapter works on the main thread. WebKit's
 writable stream writes the whole buffer behind a `Uint8Array` view, so the
 adapter passes partial views as exact copies.
+
+## Parallel reads and writes
+
+Read-only opens are shared: any number of them can read one file at once. A
+writable open owns its file. `shared: true` without `readOnly` opens a shared
+writer instead, where the adapter supports it. Shared readers, shared writers
+and an owner exclude one another: an open of one kind rejects `BUSY` while a
+handle of another kind is open, and a removal rejects `BUSY` while any handle
+is. OPFS and directory handles share across workers and tabs, the native and
+memory adapters within one realm (Node.js worker threads never exclude each
+other). For a parallel scan, each worker opens the file and streams its own
+byte range:
+
+```js
+// In each of N dedicated workers: scan bytes [start, end) of one file.
+const storage = await createOPFSStorage({ name: 'my-db' });
+const file = await storage.open('table.dsq', { readOnly: true });
+try {
+  for await (const chunk of file.stream({ start, end, chunkSize: 1024 * 1024 })) decode(chunk);
+} finally {
+  await file.close();
+}
+```
+
+On OPFS, every shared reader reads through a read-only sync access handle where
+the browser has them (Chromium 151). Firefox 153 and WebKit 26.5 ignore the
+`mode` option and allow one sync handle per file (VERIFIED, probe). There the
+first shared reader takes that handle and the others read `getFile()`
+snapshots, which cost more per call, so stream shared scans in chunks of
+1 MiB or more. `shared: false` makes a read-only open an owner.
+
+A shared writer writes at explicit offsets, and the caller keeps the writers'
+byte ranges apart. `append` rejects `UNSUPPORTED`, since other writers move the
+end of the file, and `size()` and `read` ask the file each time instead of
+tracking its size. `capabilities.sharedWriters` says where they exist: memory,
+native files, and OPFS in Chromium (`readwrite-unsafe` sync access handles).
+Firefox, WebKit and directory handles reject them `UNSUPPORTED`. There, and
+for code that appends, give each worker a file of its own: ownership is per
+file, so such workers write at once on every adapter.
+
+```js
+// Worker i of N writes its slice of a preallocated file.
+const file = await storage.open('table.dsq', { create: true, shared: true });
+try {
+  await file.write(offsets[i], encoded);
+  await file.flush();
+} finally {
+  await file.close();
+}
+```
+
+VERIFIED (`BENCH_DATASET_MIB=128 BENCH_REPS=5 bun run bench:parallel`, macOS
+arm64, 18 logical CPUs at load average 11 to 16, 2026-11-20): with a stand-in
+decoder of a few hundred MiB/s per core and 1 MiB chunks, whole scans ran this
+fast (MiB/s, opens and closes included):
+
+| Browser | 1 owner | 1 shared | 4 shared, 4 workers | 8 shared, 8 workers |
+| --- | --- | --- | --- | --- |
+| Chromium 151 | 469 | 461 | 1,574 (3.4×) | 2,596 (5.5×) |
+| Firefox 153 | 441 | 427 | 1,000 (2.3×) | 1,471 (3.3×) |
+| WebKit 26.5 | 202 | 203 | 723 (3.6×) | 790 (3.9×) |
+
+A lone shared reader keeps an owner's speed without decoding work too (1 MiB
+chunks: Firefox 3,879 against 3,368 MiB/s, WebKit 7,111 against 6,737; WebKit
+with 64 KiB chunks 5,818 against 5,565, where snapshots alone read 194). Several
+snapshot readers without decoding work read slower than one owner (Firefox at
+most 2,032, WebKit at most 2,560), and with 64 KiB chunks four WebKit workers
+gained nothing (196 against 198). Parallel scans pay off where decoding, not
+reading, bounds the scan.
+
+The same run wrote the dataset after a stand-in encoder in Chromium 151 (MiB/s,
+1 MiB chunks):
+
+| Layout | 1 worker | 4 workers | 8 workers |
+| --- | --- | --- | --- |
+| One file, one owner | 468 | | |
+| A file per worker | | 1,540 (3.3×) | 2,462 (5.3×) |
+| One file, shared writers | | 1,421 (3.0×) | 1,852 (4.0×) |
+
+A file per worker gained 2.9× in Firefox at 4 workers in this run and the one
+before. WebKit varied between the two runs (one writer 205 against 663 MiB/s),
+so its write figures are not conclusive. Without encoding work, parallel writes
+gained little or lost (Chromium: one owner 5,689 MiB/s, eight shared writers
+4,156).
 
 ## API and invariants
 
@@ -195,14 +282,15 @@ adapter passes partial views as exact copies.
 | --- | --- |
 | `open(name, options?)` | Missing file fails unless `create:true`; creation never truncates an existing file. |
 | `open(name, {create:true, exclusive:true})` | Requires a new file. |
-| `open(name, {readOnly:true})` | Requires an existing file; mutations fail. |
-| `open(name, {writeBuffer: bytes})` | Collects appends of up to `bytes` before one backend write; see Write buffer. Not with `readOnly`. |
+| `open(name, {readOnly:true})` | Requires an existing file; mutations fail. Shared with other read-only handles; `shared:false` makes a read-only owner. See Parallel reads and writes. |
+| `open(name, {shared:true})` | A shared writer: several write one file at explicit offsets; `append` rejects `UNSUPPORTED`. Where `capabilities.sharedWriters`; see Parallel reads and writes. |
+| `open(name, {writeBuffer: bytes})` | Collects appends of up to `bytes` before one backend write; see Write buffer. Not with `readOnly` or a shared writer. |
 | `list()` | Sorted names of regular supported entries; not recursive or a transactional snapshot. |
-| `remove(name)` | True when removed, false when absent; rejects an open owned file. |
+| `remove(name)` | True when removed, false when absent; rejects `BUSY` while any handle of the file is open. |
 
 | File operation | Contract |
 | --- | --- |
-| `size()` | Current byte size. The handle asks the backend once and then tracks its own writes; see Performance. |
+| `size()` | Current byte size. The handle asks the backend once and then tracks its own writes; see Performance. A shared writer asks every time. |
 | `read(offset, length, options?)` | Up to `length` owned bytes; EOF returns an empty array. |
 | `readInto(offset, target, options?)` | Fills the supplied Uint8Array window until full/EOF; returns count; leaves the remainder untouched. |
 | `readExactly(offset, length, options?)` | Returns the full requested range or rejects `UNEXPECTED_EOF`. |
@@ -254,7 +342,8 @@ later pulls after accepted work drains.
 `flush()` is explicit. `close()` does not imply it. File flush does not promise
 directory metadata durability, atomic replacement, multi-file commits, or power
 failure recovery. Those belong to the record engine and its commit protocol.
-Storage capabilities declare `snapshots:false` and `atomicReplace:false`.
+Storage capabilities declare `snapshots:false` and `atomicReplace:false`, and
+`sharedWriters` whether several handles can write one file.
 
 Operational errors expose `StorageError.code`: `NOT_FOUND`, `ALREADY_EXISTS`,
 `BUSY`, `CLOSED`, `READ_ONLY`, `PERMISSION_DENIED`, `QUOTA_EXCEEDED`,
@@ -273,8 +362,8 @@ before any input is copied:
 | Option | Default | Bounds |
 | --- | --- | --- |
 | `maxWriteBytes` | 64 MiB | One write/append input. A larger input throws `RangeError`. |
-| `maxPendingWriteBytes` | 64 MiB | Write/append input copies held by queued or running operations of one handle. |
-| `maxPendingOperations` | 1,024 | Queued plus running operations of one handle, writes or not. |
+| `maxPendingWriteBytes` | 128 MiB | Write/append input copies held by queued or running operations of one handle. |
+| `maxPendingOperations` | 2,048 | Queued plus running operations of one handle, writes or not. |
 
 Pass them to `createMemoryStorage`, `createFileStorage`, `createOPFSStorage` or
 `createStorageFile`. Values are positive safe integers. Setting only one byte
@@ -486,7 +575,7 @@ deletion.
 
 ## Verification and measurements
 
-The same 33 contract cases, admission, `appendChunks`, the write buffer and
+The same 35 contract cases, admission, `appendChunks`, the write buffer and
 buffer hand-off included, run against memory files and native files with
 asynchronous and with synchronous I/O under vitest on Node.js and under
 `bun test` on Bun, and
@@ -495,7 +584,8 @@ Chromium, Firefox and WebKit dedicated workers. Additional tests cover DSON
 framing, a fault matrix of short, invalid and failing backend calls, admission
 accounting against a stalled backend, close-failure quarantine, borrowed
 `readInto` targets, cross-build error codes, ownership across module formats,
-workers and processes, worker termination, append batching, shared flushes,
+workers and processes, shared readers and shared writers across workers and
+worker threads, workers that own different files at once, worker termination, append batching, shared flushes,
 reads that overlap around a write, call-time writes with synchronous I/O,
 stream read-ahead, and pulling chunks from a synthetic 8 GiB source: 64 KiB
 chunks with one read ahead, and 4 KiB chunks one 64 KiB block at a time. Those
@@ -507,7 +597,9 @@ TypeScript declarations with neither DOM nor Node ambient types, and that the
 root entry's module graph imports no platform module. `make bench` writes
 report-only benchmarks for Node.js, Bun, and OPFS in Chromium, Firefox and
 WebKit, each compared with the 0.1.0 tarball, to `benchmarks/`; they are not a
-comparison with other databases. See
+comparison with other databases. `bun run bench:parallel` reports parallel
+scans through shared OPFS readers, and parallel writes to one file per worker
+and to one file through shared writers, to `output/bench-parallel.json`. See
 `VALIDATION.md` for the exact executed runtime matrix and limitations.
 
 For a separately installed browser, `CHROMIUM_EXECUTABLE_PATH` selects its

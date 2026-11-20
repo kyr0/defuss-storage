@@ -1,0 +1,1182 @@
+{
+  "version": "0.4.0",
+  "generatedAt": "2026-11-20T03:25:32.905Z",
+  "platform": "darwin",
+  "arch": "arm64",
+  "cpu": "Apple M5 Max",
+  "logicalCpus": 18,
+  "totalMemoryBytes": 51539607552,
+  "config": {
+    "reps": 5,
+    "datasetBytes": 33554432,
+    "chunkSizes": [
+      4096,
+      65536,
+      1048576
+    ],
+    "randomReads": 2000,
+    "randomReadBytes": 4096
+  },
+  "notes": [
+    "Report only: timings vary per machine, browser and run and are never CI thresholds.",
+    "OPFS timings include the browser implementation and the OS page cache (warm cache).",
+    "Per-call latencies below timerStepMicros are quantized; compare the mean."
+  ],
+  "browsers": {
+    "chromium": {
+      "version": "151.0.7922.34",
+      "crossOriginIsolated": true,
+      "timerStepMicros": 5,
+      "sequential": {
+        "0.4.0": {
+          "opfs": {
+            "4096": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 470.208,
+                "min": 372.548,
+                "max": 555.749
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 848.919,
+                "min": 688.024,
+                "max": 1678.468
+              },
+              "flushMs": {
+                "median": 2.91,
+                "min": 1.485,
+                "max": 3.905
+              },
+              "streamMiBps": {
+                "median": 2996.255,
+                "min": 1609.658,
+                "max": 3444.564
+              },
+              "streamWithChecksumMiBps": {
+                "median": 1675.831,
+                "min": 1060.305,
+                "max": 1936.46
+              },
+              "firstChunkMs": {
+                "median": 0.05,
+                "min": 0.04,
+                "max": 1.87
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 3.805,
+                "p50": 5,
+                "p95": 10,
+                "p99": 25
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1.61,
+                "p50": 0,
+                "p95": 5,
+                "p99": 10
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 734281.782,
+                "min": 716204.113,
+                "max": 852424.082
+              }
+            },
+            "65536": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 3740.503,
+                "min": 2427,
+                "max": 5059.288
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 3354.298,
+                "min": 2406.015,
+                "max": 3778.04
+              },
+              "flushMs": {
+                "median": 1.67,
+                "min": 1.435,
+                "max": 4.85
+              },
+              "streamMiBps": {
+                "median": 5618.964,
+                "min": 3146.509,
+                "max": 5765.766
+              },
+              "streamWithChecksumMiBps": {
+                "median": 2857.143,
+                "min": 2486.402,
+                "max": 3312.629
+              },
+              "firstChunkMs": {
+                "median": 0.045,
+                "min": 0.035,
+                "max": 0.125
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 3.348,
+                "p50": 5,
+                "p95": 10,
+                "p99": 10
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1.324,
+                "p50": 0,
+                "p95": 5,
+                "p99": 5
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 682011.934,
+                "min": 537092.985,
+                "max": 789733.465
+              }
+            },
+            "1048576": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 7843.137,
+                "min": 6564.103,
+                "max": 10526.316
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 5144.695,
+                "min": 3121.951,
+                "max": 5498.282
+              },
+              "flushMs": {
+                "median": 1.415,
+                "min": 1.27,
+                "max": 1.89
+              },
+              "streamMiBps": {
+                "median": 7079.646,
+                "min": 5579.773,
+                "max": 7609.988
+              },
+              "streamWithChecksumMiBps": {
+                "median": 3275.333,
+                "min": 1834.862,
+                "max": 3446.419
+              },
+              "firstChunkMs": {
+                "median": 0.15,
+                "min": 0.13,
+                "max": 0.165
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 3.302,
+                "p50": 0,
+                "p95": 10,
+                "p99": 15
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1.422,
+                "p50": 0,
+                "p95": 5,
+                "p99": 5
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 655737.709,
+                "min": 537273.338,
+                "max": 783162.014
+              }
+            }
+          }
+        },
+        "0.1.0": {
+          "opfs": {
+            "4096": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 353.943,
+                "min": 277.959,
+                "max": 481.638
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 263.722,
+                "min": 154.463,
+                "max": 427.265
+              },
+              "flushMs": {
+                "median": 3.545,
+                "min": 1.7,
+                "max": 4.31
+              },
+              "streamMiBps": {
+                "median": 1017.488,
+                "min": 585.277,
+                "max": 1694.018
+              },
+              "streamWithChecksumMiBps": {
+                "median": 1000.469,
+                "min": 643.475,
+                "max": 1353.352
+              },
+              "firstChunkMs": {
+                "median": 0.065,
+                "min": 0.04,
+                "max": 0.16
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 3.491,
+                "p50": 5,
+                "p95": 10,
+                "p99": 15
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1.583,
+                "p50": 0,
+                "p95": 5,
+                "p99": 5
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 559049.618,
+                "min": 414722.652,
+                "max": 749063.674
+              }
+            },
+            "65536": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 2126.246,
+                "min": 1958.984,
+                "max": 2286.531
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 2153.432,
+                "min": 1419.383,
+                "max": 2815.662
+              },
+              "flushMs": {
+                "median": 2.065,
+                "min": 1.4,
+                "max": 4.4
+              },
+              "streamMiBps": {
+                "median": 6060.606,
+                "min": 4637.681,
+                "max": 6557.377
+              },
+              "streamWithChecksumMiBps": {
+                "median": 2782.609,
+                "min": 2673.35,
+                "max": 3225.806
+              },
+              "firstChunkMs": {
+                "median": 0.04,
+                "min": 0.025,
+                "max": 0.08
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 3.868,
+                "p50": 5,
+                "p95": 10,
+                "p99": 15
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1.436,
+                "p50": 0,
+                "p95": 5,
+                "p99": 5
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 714285.719,
+                "min": 569192.46,
+                "max": 777453.842
+              }
+            },
+            "1048576": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 4597.701,
+                "min": 3277.01,
+                "max": 5220.228
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 4484.933,
+                "min": 3648.803,
+                "max": 5194.805
+              },
+              "flushMs": {
+                "median": 1.715,
+                "min": 1.275,
+                "max": 5.695
+              },
+              "streamMiBps": {
+                "median": 7930.607,
+                "min": 4996.097,
+                "max": 8579.088
+              },
+              "streamWithChecksumMiBps": {
+                "median": 3504.929,
+                "min": 2673.35,
+                "max": 3710.145
+              },
+              "firstChunkMs": {
+                "median": 0.145,
+                "min": 0.13,
+                "max": 0.195
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 3.618,
+                "p50": 5,
+                "p95": 10,
+                "p99": 15
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1.234,
+                "p50": 0,
+                "p95": 5,
+                "p99": 5
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 664176.009,
+                "min": 562192.55,
+                "max": 733272.23
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "appendMiBps": {
+          "append 4 KiB awaited": {
+            "median": 570.207,
+            "min": 517.464,
+            "max": 623.114
+          },
+          "append 4 KiB awaited, writeBuffer 1 MiB": {
+            "median": 6043.437,
+            "min": 4620.939,
+            "max": 6941.432
+          },
+          "appendChunks 4 KiB, inFlight 1": {
+            "median": 553.346,
+            "min": 530.988,
+            "max": 575.074
+          },
+          "appendChunks 4 KiB, inFlight 16": {
+            "median": 571.633,
+            "min": 534.491,
+            "max": 577.357
+          },
+          "append 1 MiB awaited, copy": {
+            "median": 7119.021,
+            "min": 6361.829,
+            "max": 7911.001
+          },
+          "append 1 MiB awaited, transfer": {
+            "median": 7520.564,
+            "min": 7025.247,
+            "max": 8070.618
+          }
+        }
+      }
+    },
+    "firefox": {
+      "version": "153.0",
+      "crossOriginIsolated": true,
+      "timerStepMicros": 20,
+      "sequential": {
+        "0.4.0": {
+          "opfs": {
+            "4096": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 54.845,
+                "min": 51.032,
+                "max": 61.246
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 238.628,
+                "min": 162.75,
+                "max": 300.413
+              },
+              "flushMs": {
+                "median": 1.06,
+                "min": 0.5,
+                "max": 1.14
+              },
+              "streamMiBps": {
+                "median": 429.992,
+                "min": 402.414,
+                "max": 566.773
+              },
+              "streamWithChecksumMiBps": {
+                "median": 323.625,
+                "min": 229.292,
+                "max": 354.217
+              },
+              "firstChunkMs": {
+                "median": 0.16,
+                "min": 0.1,
+                "max": 0.36
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 33.038,
+                "p50": 20,
+                "p95": 60,
+                "p99": 120
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 26.412,
+                "p50": 20,
+                "p95": 60,
+                "p99": 120
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 38138.825,
+                "min": 31984.647,
+                "max": 42047.724
+              }
+            },
+            "65536": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 815.91,
+                "min": 592.593,
+                "max": 950.119
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 1268.834,
+                "min": 1090.661,
+                "max": 1564.027
+              },
+              "flushMs": {
+                "median": 0.96,
+                "min": 0.94,
+                "max": 1.32
+              },
+              "streamMiBps": {
+                "median": 1062.417,
+                "min": 739.372,
+                "max": 1340.034
+              },
+              "streamWithChecksumMiBps": {
+                "median": 479.042,
+                "min": 430.455,
+                "max": 503.778
+              },
+              "firstChunkMs": {
+                "median": 0.12,
+                "min": 0.1,
+                "max": 0.14
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 35.7,
+                "p50": 20,
+                "p95": 60,
+                "p99": 160
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 28.414,
+                "p50": 20,
+                "p95": 60,
+                "p99": 120
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 34882.707,
+                "min": 29107.845,
+                "max": 39706.174
+              }
+            },
+            "1048576": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 4199.475,
+                "min": 1773.836,
+                "max": 5860.806
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 2821.869,
+                "min": 1622.718,
+                "max": 3587.444
+              },
+              "flushMs": {
+                "median": 0.92,
+                "min": 0.8,
+                "max": 1.12
+              },
+              "streamMiBps": {
+                "median": 4532.578,
+                "min": 3212.851,
+                "max": 5111.821
+              },
+              "streamWithChecksumMiBps": {
+                "median": 663.625,
+                "min": 632.661,
+                "max": 725.295
+              },
+              "firstChunkMs": {
+                "median": 0.24,
+                "min": 0.22,
+                "max": 0.6
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 37.322,
+                "p50": 20,
+                "p95": 80,
+                "p99": 200
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 30.986,
+                "p50": 20,
+                "p95": 60,
+                "p99": 160
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 36730.946,
+                "min": 30409.001,
+                "max": 42171.85
+              }
+            }
+          }
+        },
+        "0.1.0": {
+          "opfs": {
+            "4096": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 41.974,
+                "min": 35.659,
+                "max": 44.048
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 42.621,
+                "min": 36.888,
+                "max": 45.313
+              },
+              "flushMs": {
+                "median": 1.04,
+                "min": 0.98,
+                "max": 1.14
+              },
+              "streamMiBps": {
+                "median": 114.72,
+                "min": 89.857,
+                "max": 121.396
+              },
+              "streamWithChecksumMiBps": {
+                "median": 98.069,
+                "min": 85.251,
+                "max": 100.566
+              },
+              "firstChunkMs": {
+                "median": 0.14,
+                "min": 0.08,
+                "max": 0.5
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 50.492,
+                "p50": 40,
+                "p95": 100,
+                "p99": 200
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 28.346,
+                "p50": 20,
+                "p95": 60,
+                "p99": 120
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 37990.312,
+                "min": 27096.599,
+                "max": 39737.731
+              }
+            },
+            "65536": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 541.089,
+                "min": 404.142,
+                "max": 573.682
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 486.618,
+                "min": 429.415,
+                "max": 582.454
+              },
+              "flushMs": {
+                "median": 0.94,
+                "min": 0.92,
+                "max": 0.98
+              },
+              "streamMiBps": {
+                "median": 1069.519,
+                "min": 929.152,
+                "max": 1290.323
+              },
+              "streamWithChecksumMiBps": {
+                "median": 451.34,
+                "min": 193.447,
+                "max": 753.65
+              },
+              "firstChunkMs": {
+                "median": 0.14,
+                "min": 0.08,
+                "max": 0.32
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 49.744,
+                "p50": 40,
+                "p95": 80,
+                "p99": 160
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 28.198,
+                "p50": 20,
+                "p95": 60,
+                "p99": 100
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 32520.325,
+                "min": 25372.661,
+                "max": 37512.895
+              }
+            },
+            "1048576": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 2457.757,
+                "min": 1785.714,
+                "max": 3082.852
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 2017.654,
+                "min": 591.935,
+                "max": 2957.486
+              },
+              "flushMs": {
+                "median": 0.88,
+                "min": 0.86,
+                "max": 0.92
+              },
+              "streamMiBps": {
+                "median": 3162.055,
+                "min": 1159.42,
+                "max": 5442.177
+              },
+              "streamWithChecksumMiBps": {
+                "median": 643.345,
+                "min": 386.847,
+                "max": 753.296
+              },
+              "firstChunkMs": {
+                "median": 0.32,
+                "min": 0.26,
+                "max": 0.36
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 55.33,
+                "p50": 40,
+                "p95": 100,
+                "p99": 260
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 33.086,
+                "p50": 20,
+                "p95": 60,
+                "p99": 180
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 34317.09,
+                "min": 31220.731,
+                "max": 36202.371
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "appendMiBps": {
+          "append 4 KiB awaited": {
+            "median": 59.697,
+            "min": 45.691,
+            "max": 66.327
+          },
+          "append 4 KiB awaited, writeBuffer 1 MiB": {
+            "median": 1869.159,
+            "min": 1324.503,
+            "max": 2091.503
+          },
+          "appendChunks 4 KiB, inFlight 1": {
+            "median": 53.937,
+            "min": 43.428,
+            "max": 62.439
+          },
+          "appendChunks 4 KiB, inFlight 16": {
+            "median": 41.782,
+            "min": 36.069,
+            "max": 54.127
+          },
+          "append 1 MiB awaited, copy": {
+            "median": 3265.306,
+            "min": 1864.802,
+            "max": 5653.71
+          },
+          "append 1 MiB awaited, transfer": {
+            "median": 4456.825,
+            "min": 2846.975,
+            "max": 5245.902
+          }
+        }
+      }
+    },
+    "webkit": {
+      "version": "26.5",
+      "crossOriginIsolated": true,
+      "timerStepMicros": 20,
+      "sequential": {
+        "0.4.0": {
+          "opfs": {
+            "4096": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 920.598,
+                "min": 187.354,
+                "max": 963.855
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 1990.05,
+                "min": 1930.036,
+                "max": 2605.863
+              },
+              "flushMs": {
+                "median": 0.86,
+                "min": 0.82,
+                "max": 1.2
+              },
+              "streamMiBps": {
+                "median": 4833.837,
+                "min": 3485.839,
+                "max": 6477.733
+              },
+              "streamWithChecksumMiBps": {
+                "median": 2519.685,
+                "min": 2110.818,
+                "max": 2787.456
+              },
+              "firstChunkMs": {
+                "median": 0.06,
+                "min": 0.04,
+                "max": 1.76
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 2.026,
+                "p50": 0,
+                "p95": 20,
+                "p99": 20
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1.134,
+                "p50": 0,
+                "p95": 20,
+                "p99": 20
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 754716.981,
+                "min": 619195.046,
+                "max": 793650.794
+              }
+            },
+            "65536": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 6896.552,
+                "min": 6177.606,
+                "max": 7272.727
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 2862.254,
+                "min": 1830.664,
+                "max": 4848.485
+              },
+              "flushMs": {
+                "median": 0.76,
+                "min": 0.74,
+                "max": 0.8
+              },
+              "streamMiBps": {
+                "median": 7476.636,
+                "min": 5574.913,
+                "max": 8247.423
+              },
+              "streamWithChecksumMiBps": {
+                "median": 3162.055,
+                "min": 2935.78,
+                "max": 3764.706
+              },
+              "firstChunkMs": {
+                "median": 0.04,
+                "min": 0.02,
+                "max": 0.2
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 2.5,
+                "p50": 0,
+                "p95": 20,
+                "p99": 20
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1.424,
+                "p50": 0,
+                "p95": 20,
+                "p99": 20
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 727272.727,
+                "min": 686106.346,
+                "max": 860215.054
+              }
+            },
+            "1048576": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 11347.518,
+                "min": 7729.469,
+                "max": 11428.571
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 6106.87,
+                "min": 5555.556,
+                "max": 8839.779
+              },
+              "flushMs": {
+                "median": 0.76,
+                "min": 0.74,
+                "max": 0.88
+              },
+              "streamMiBps": {
+                "median": 11428.571,
+                "min": 7407.407,
+                "max": 12403.101
+              },
+              "streamWithChecksumMiBps": {
+                "median": 3703.704,
+                "min": 3278.689,
+                "max": 4571.429
+              },
+              "firstChunkMs": {
+                "median": 0.12,
+                "min": 0.1,
+                "max": 0.12
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 2.054,
+                "p50": 0,
+                "p95": 20,
+                "p99": 20
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1.056,
+                "p50": 0,
+                "p95": 20,
+                "p99": 20
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 683760.684,
+                "min": 539083.558,
+                "max": 808080.808
+              }
+            }
+          }
+        },
+        "0.1.0": {
+          "opfs": {
+            "4096": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 797.21,
+                "min": 631.413,
+                "max": 820.092
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 775.194,
+                "min": 706.09,
+                "max": 811.771
+              },
+              "flushMs": {
+                "median": 0.86,
+                "min": 0.8,
+                "max": 0.92
+              },
+              "streamMiBps": {
+                "median": 2472.952,
+                "min": 2053.915,
+                "max": 2792.321
+              },
+              "streamWithChecksumMiBps": {
+                "median": 1629.328,
+                "min": 1445.348,
+                "max": 1758.242
+              },
+              "firstChunkMs": {
+                "median": 0.04,
+                "min": 0.02,
+                "max": 0.36
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 2.474,
+                "p50": 0,
+                "p95": 20,
+                "p99": 20
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1.002,
+                "p50": 0,
+                "p95": 0,
+                "p99": 20
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 739371.534,
+                "min": 715563.506,
+                "max": 756143.667
+              }
+            },
+            "65536": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 3931.204,
+                "min": 3703.704,
+                "max": 4481.793
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 4113.111,
+                "min": 3278.689,
+                "max": 4419.89
+              },
+              "flushMs": {
+                "median": 0.78,
+                "min": 0.76,
+                "max": 0.88
+              },
+              "streamMiBps": {
+                "median": 7960.199,
+                "min": 7766.99,
+                "max": 8888.889
+              },
+              "streamWithChecksumMiBps": {
+                "median": 3563.474,
+                "min": 2763.385,
+                "max": 3678.161
+              },
+              "firstChunkMs": {
+                "median": 0.04,
+                "min": 0.02,
+                "max": 0.06
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 2.35,
+                "p50": 0,
+                "p95": 20,
+                "p99": 20
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1,
+                "p50": 0,
+                "p95": 0,
+                "p99": 20
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 787401.575,
+                "min": 731261.426,
+                "max": 858369.099
+              }
+            },
+            "1048576": {
+              "bytes": 33554432,
+              "reps": 5,
+              "readBytes": 4096,
+              "appendMiBps": {
+                "median": 6060.606,
+                "min": 2108.037,
+                "max": 8247.423
+              },
+              "pipelinedAppendMiBps": {
+                "inFlight": 16,
+                "median": 6477.733,
+                "min": 4719.764,
+                "max": 7655.502
+              },
+              "flushMs": {
+                "median": 0.82,
+                "min": 0.78,
+                "max": 0.98
+              },
+              "streamMiBps": {
+                "median": 8743.169,
+                "min": 6060.606,
+                "max": 12403.101
+              },
+              "streamWithChecksumMiBps": {
+                "median": 3644.647,
+                "min": 3361.345,
+                "max": 3980.1
+              },
+              "firstChunkMs": {
+                "median": 0.14,
+                "min": 0.1,
+                "max": 0.56
+              },
+              "readMicros": {
+                "reads": 10000,
+                "mean": 2.308,
+                "p50": 0,
+                "p95": 20,
+                "p99": 20
+              },
+              "readIntoMicros": {
+                "reads": 10000,
+                "mean": 1.046,
+                "p50": 0,
+                "p95": 20,
+                "p99": 20
+              },
+              "parallelReadsPerSecond": {
+                "inFlight": 8,
+                "median": 702987.698,
+                "min": 630914.826,
+                "max": 795228.628
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "appendMiBps": {
+          "append 4 KiB awaited": {
+            "median": 979.792,
+            "min": 659.794,
+            "max": 1040.312
+          },
+          "append 4 KiB awaited, writeBuffer 1 MiB": {
+            "median": 7111.111,
+            "min": 6177.606,
+            "max": 8163.265
+          },
+          "appendChunks 4 KiB, inFlight 1": {
+            "median": 902.425,
+            "min": 734.956,
+            "max": 969.697
+          },
+          "appendChunks 4 KiB, inFlight 16": {
+            "median": 892.359,
+            "min": 853.333,
+            "max": 957.51
+          },
+          "append 1 MiB awaited, copy": {
+            "median": 9580.838,
+            "min": 8000,
+            "max": 10256.41
+          },
+          "append 1 MiB awaited, transfer": {
+            "median": 9248.555,
+            "min": 8602.151,
+            "max": 10810.811
+          }
+        }
+      }
+    }
+  }
+}

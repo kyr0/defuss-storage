@@ -17,26 +17,36 @@ logical record sources. There is no runtime dependency between these layers.
 - `file.ts`: one serial operation queue per handle, or reads that overlap
   between mutations within a `maxReadBytes` budget for native handles with
   asynchronous I/O; admission (operation and write-byte reservations); size
-  tracking; append batching over an optional vectored backend write; call-time
+  tracking, which shared writers skip; append batching over an optional vectored backend write; call-time
   writes on synchronous backends; shared flushes; partial-I/O completion;
   independent input/output buffers; borrowed-window revalidation; streams that
   read in blocks of up to 64 KiB, one block ahead of slow consumers; the opt-in
   write buffer; buffer hand-off (`transfer`).
 - `streams.ts`: `appendChunks` with an optional in-flight window, built only on
   the public `StorageFile` API.
-- `memory.ts`: bounded geometric in-memory file buffers and adapter-local owners.
+- `memory.ts`: bounded geometric in-memory file buffers, adapter-local owners
+  and counts of shared readers and writers.
 - `node.ts`: FileHandle I/O on libuv's thread pool, or synchronous calls on the
   same descriptors (`io: "sync"`), and canonical-path ownership shared by ESM/CJS
-  through a versioned global symbol in one JS realm. No multi-process lock claim.
+  through versioned global symbols in one JS realm: an owner set, plus a count
+  of shared readers and of shared writers per path that also keeps the path in
+  the owner set, so the other kind and an older copy of the package in the
+  realm still see it owned. No multi-process
+  lock claim.
 - `opfs.ts`: dedicated-worker sync-access handles; per-file origin Web Locks held
-  through close. Removing files participates in the same ownership protocol. Its
-  vectored write joins queued appends into one write of up to 1 MiB.
+  through close, shared for shared handles. Removing files participates in the
+  same ownership protocol. Its vectored write joins queued appends into one
+  write of up to 1 MiB. Shared readers read through read-only sync access
+  handles, or, where the browser has none, through the file's one sync handle
+  or `file-handle.ts` snapshots; shared writers use `readwrite-unsafe` handles.
 - `directory.ts`: any `FileSystemDirectoryHandle` (a picked folder in Chromium,
   or OPFS), in windows and workers. Reads use `getFile()` snapshots; each
   backend write is one committed `createWritable` stream, because an open
   stream's bytes stay invisible to reads until it closes. Web Locks keyed by
   the adapter name give the same ownership protocol as OPFS.
-- `locks.ts`: the non-waiting exclusive Web Lock both browser adapters use.
+- `file-handle.ts`: the byte backend over a `FileSystemFileHandle` (snapshot
+  reads, one committed stream per write) for both browser adapters.
+- `locks.ts`: the non-waiting exclusive or shared Web Lock both browser adapters use.
 - `custom.ts`: supported constructor for third-party byte backends.
 - `index.ts`: memory and common API only; no native imports or I/O at import
   time. The packed-consumer test walks this entry's module graph to enforce it.
@@ -73,7 +83,7 @@ sequenceDiagram
 Why barriers instead of overlap on read-only handles alone: a caller that looks
 up and appends through one handle would otherwise read one by one. VERIFIED:
 (interleaved comparison, `VALIDATION.md`) eight 4 KiB reads in flight on a
-writable handle reached 142k reads/s against 54k one by one. Why that budget instead of the operation limit: 1,024
+writable handle reached 142k reads/s against 54k one by one. Why that budget instead of the operation limit: 2,048
 overlapping reads could each allocate up to `maxReadBytes`; the byte budget
 keeps the allocation bound of a serial queue. Waiting reads keep call order, so
 a large read is never starved by small ones. Why not with a write buffer: the
@@ -295,6 +305,64 @@ open, which is when a read at pull time would return the same bytes. Streams pin
 end offset, not a revision: overwrites remain visible. True read snapshots will
 require a record-layer immutable generation/commit design.
 
+## Shared readers and writers
+
+A full scan decodes on one thread, and so does a bulk load encode. Shared
+handles let several workers open one file at once, each reading or writing its
+own byte range. There are two shared kinds: readers (`readOnly: true`, shared
+by default) and writers (`shared: true` without `readOnly`). Shared readers,
+shared writers and an owner exclude one another, and a removal needs the file
+free. The native and memory registries count each kind per path. OPFS and
+directory handles take the file's Web Lock in shared mode for either kind, and
+an owner takes it exclusively. Shared readers and shared writers on OPFS then
+exclude each other through the sync access handles' native modes.
+
+```mermaid
+flowchart TD
+  open["open(name, options)"] --> kind{"shared, and readOnly?"}
+  kind -->|owner| ex["exclusive Web Lock"] --> rw["createSyncAccessHandle()"]
+  kind -->|writer| modes1{"handles take a mode?"}
+  modes1 -->|no: Firefox, WebKit| unsup["UNSUPPORTED"]
+  modes1 -->|yes: Chromium| w["shared Web Lock, then mode 'readwrite-unsafe'"]
+  kind -->|reader| r["shared Web Lock"] --> modes2{"handles take a mode?"}
+  modes2 -->|yes: Chromium| ro["mode 'read-only'"]
+  modes2 -->|no: Firefox, WebKit| first{"sync handle free?"}
+  first -->|yes| sync["the file's one sync handle"]
+  first -->|no| snap["getFile() snapshots"]
+```
+
+A lock held by the other kind or an owner, or a native handle conflict, rejects
+`BUSY`.
+
+VERIFIED: (probes, 2026-11-20) in Chromium 151, handles opened with
+`mode: "read-only"` report that mode, refuse writes and coexist across workers;
+two `readwrite-unsafe` handles in two workers see each other's bytes and size
+at once; either kind fails while the other is held (NoModificationAllowedError).
+Firefox 153 and WebKit 26.5 ignore the option: their handles have no `mode`,
+accept writes, and a second handle on the file fails. The `mode` attribute
+therefore tells the browsers apart without opening a file. In all three
+browsers a worker reads `getFile()` snapshots, fresh or taken earlier, while
+another worker holds the file's sync handle. Snapshots read more slowly per call
+(300 to 700 MiB/s against 2,100 to 10,700 MiB/s for 64 KiB reads through a
+sync handle).
+
+Why read-only opens are shared by default: a reader gains nothing from
+excluding other readers, and in Firefox and WebKit a lone shared reader still
+takes the sync handle, so the default costs a single reader nothing.
+Why readers in Firefox and WebKit do not all read snapshots: one reader would
+then lose up to 30× on small reads (WebKit, 64 KiB chunks, 6,400 against
+194 MiB/s before this change, `bun run bench:parallel`). Why not one I/O worker
+that serves reads to the others: each read would cost a message round trip, and
+the file would still be read on one thread.
+
+Why shared writers are opt-in: they write at explicit offsets only. `append`
+rejects `UNSUPPORTED`, since choosing the end of the file and writing there
+would race the other writers, and `size()` and `read` ask the file each time
+instead of tracking the size. Code that appends would break if writable opens
+became shared. Where writers cannot share one file (Firefox, WebKit, directory
+handles, whose every write commits a copy of the whole file), workers that
+each own a file write at once on every adapter.
+
 ## Persistence scope
 
 There is no implicit transaction, rollback, durable rename, delete durability,
@@ -317,12 +385,12 @@ Relevant platform contracts:
 
 - https://nodejs.org/api/fs.html: FileHandle read/write/sync/truncate/close.
 - https://fs.spec.whatwg.org/: sync OPFS access, worker exposure and flush.
-- https://www.w3.org/TR/web-locks/: exclusive origin lock requests and lifetime.
+- https://www.w3.org/TR/web-locks/: exclusive and shared origin lock requests and lifetime.
 
 ## Deliberate constraints (0.1 and 0.2)
 
-Flat portable names; no folders exposed to callers. One handle owner even for
-reads. Explicit offsets rather than a shared mutable seek cursor. No HTTP
+Flat portable names; no folders exposed to callers. One owner per file, or any
+number of shared readers, or of shared writers at explicit offsets (0.4.0). Explicit offsets rather than a shared mutable seek cursor. No HTTP
 adapter: a remote immutable range source has a different consistency/capability
 contract and can be added through StorageFileBackend when required. Storage I/O
 is isomorphic, but platform capabilities are reported rather than hidden.

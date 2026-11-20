@@ -161,6 +161,35 @@ export const contractCases: ContractCase[] = [
     const f = await open(); await rejects(() => storage.open('data.bin'), 'BUSY'); await rejects(() => storage.remove('data.bin'), 'BUSY');
     await f.close(); equal(await storage.remove('data.bin'), true); equal(await storage.remove('data.bin'), false);
   }],
+  ['read-only handles are shared by default and exclude every other open and removal', async ({ storage, open }) => {
+    const f = await open(); await f.append(data(1, 2, 3)); await f.close();
+    const shared = { readOnly: true };
+    const a = await open('data.bin', shared); const b = await open('data.bin', { readOnly: true, shared: true });
+    equal(await Promise.all([a.size(), b.size()]), [3, 3]);
+    equal([...await a.read(0, 3)], [1, 2, 3]); equal(await collect(b.stream({ start: 1 })), [2, 3]);
+    await rejects(() => a.append(data(4)), 'READ_ONLY');
+    await rejects(() => storage.open('data.bin'), 'BUSY'); await rejects(() => storage.open('data.bin', { readOnly: true, shared: false }), 'BUSY');
+    await rejects(() => storage.remove('data.bin'), 'BUSY');
+    await a.close(); await rejects(() => storage.open('data.bin'), 'BUSY'); equal([...await b.read(2, 1)], [3]);
+    await b.close(); const g = await open('data.bin', {}); await rejects(() => storage.open('data.bin', shared), 'BUSY');
+    await g.close(); const owner = await open('data.bin', { readOnly: true, shared: false });
+    await rejects(() => storage.open('data.bin', shared), 'BUSY'); await owner.close();
+    equal(await storage.remove('data.bin'), true); await rejects(() => storage.open('data.bin', shared), 'NOT_FOUND');
+  }],
+  ['shared writers write one file at explicit offsets and exclude every other kind of open', async ({ storage, open }) => {
+    const writers = { create: true, shared: true };
+    if (!storage.capabilities.sharedWriters) { await rejects(() => storage.open('data.bin', writers), 'UNSUPPORTED'); return; }
+    const a = await open('data.bin', writers); const b = await open('data.bin', writers);
+    await Promise.all([a.write(0, data(1, 2)), b.write(4, data(5, 6))]);
+    equal(await a.size(), 6); equal([...await a.read(0, 8)], [1, 2, 0, 0, 5, 6]); equal(await collect(b.stream()), [1, 2, 0, 0, 5, 6]);
+    await b.truncate(4); equal(await a.size(), 4); equal([...await a.read(0, 8)], [1, 2, 0, 0]);
+    await rejects(() => a.append(data(7)), 'UNSUPPORTED');
+    await rejects(() => storage.open('data.bin'), 'BUSY'); await rejects(() => storage.open('data.bin', { readOnly: true }), 'BUSY');
+    await rejects(() => storage.remove('data.bin'), 'BUSY');
+    await a.close(); await b.close();
+    const r = await open('data.bin', { readOnly: true }); await rejects(() => storage.open('data.bin', writers), 'BUSY'); await r.close();
+    const f = await open(); equal([...await f.read(0, 8)], [1, 2, 0, 0]);
+  }],
   ['listing is sorted and removal preserves unrelated files', async ({ storage, open }) => {
     for (const name of ['c.bin', 'a.bin', 'b.bin']) await (await open(name)).close();
     equal(await storage.list(), ['a.bin', 'b.bin', 'c.bin']); await storage.remove('b.bin'); equal(await storage.list(), ['a.bin', 'c.bin']);
@@ -182,6 +211,8 @@ export const contractCases: ContractCase[] = [
     await rejects(() => f.stream({ start: 5, end: 4 }).next(), 'RangeError');
     await rejects(() => storage.open('bad.bin', { exclusive: true }), 'TypeError');
     await rejects(() => storage.open('bad.bin', { readOnly: true, create: true }), 'TypeError');
+    await rejects(() => storage.open('data.bin', { shared: true, writeBuffer: 4 }), 'TypeError');
+    await rejects(() => storage.open('data.bin', { readOnly: true, shared: 1 as unknown as boolean }), 'TypeError');
     equal(await f.size(), 0);
   }],
   ['write admission rejects bursts beyond the pending budgets before any I/O', async ({ limited }) => {

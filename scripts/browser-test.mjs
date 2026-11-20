@@ -57,6 +57,12 @@ async function pageSuite() {
           const b = fresh(); await call(a, 'hold', { namespace: `${namespace}-own`, kind: 'directory' });
           await call(b, 'busy', { namespace: `${namespace}-own`, kind: 'directory' }); await call(a, 'release');
         }],
+        ['directory: workers hold shared handles at once; owning opens and removal reject BUSY', async () => {
+          const ns = `${namespace}-share`, kind = 'directory'; await call(a, 'hold', { namespace: ns, kind }); await call(a, 'release');
+          const b = fresh(), c = fresh(); await Promise.all([call(b, 'share', { namespace: ns, kind }), call(c, 'share', { namespace: ns, kind })]);
+          await call(a, 'busy', { namespace: ns, kind }); await call(b, 'release'); await call(a, 'busy', { namespace: ns, kind }); await call(c, 'release');
+          await call(a, 'hold', { namespace: ns, kind }); await call(a, 'release');
+        }],
         ['directory: runs on the main thread, where OPFS sync handles do not exist', async () => {
           const origin = await navigator.storage.getDirectory();
           const folder = await (await origin.getDirectoryHandle('defuss-storage', { create: true })).getDirectoryHandle(`${namespace}-main`, { create: true });
@@ -70,7 +76,7 @@ async function pageSuite() {
       ];
       for (const [name, run] of scenarios) {
         try { await run(); result.passed.push(name); }
-        catch (error) { result.failed.push({ name, message: String(error?.stack ?? error) }); }
+        catch (error) { result.failed.push({ name, message: `${error?.message ?? error}\n${error?.stack ?? ""}` }); }
       }
     }
     if (opfs) {
@@ -81,6 +87,30 @@ async function pageSuite() {
           const b = fresh(); await call(a, 'hold', { namespace }); await call(b, 'busy', { namespace }); await call(a, 'release');
           await call(fresh(), 'reopen', { namespace });
         }],
+        ['OPFS: workers hold shared handles at once; owning opens and removal reject BUSY', async () => {
+          const ns = `${namespace}-share`; await call(a, 'hold', { namespace: ns }); await call(a, 'release');
+          const b = fresh(), c = fresh(); await Promise.all([call(b, 'share', { namespace: ns }), call(c, 'share', { namespace: ns })]);
+          const path = await call(a, 'native-lock', { namespace: ns }); await call(a, 'busy', { namespace: ns }); await call(b, 'release'); await call(a, 'busy', { namespace: ns }); await call(c, 'release');
+          await call(fresh(), 'reopen', { namespace: ns }); return path;
+        }],
+        ['OPFS: workers write one file through shared writers at once; owning opens and removal reject BUSY', async () => {
+          const ns = `${namespace}-write-shared`; await call(a, 'hold', { namespace: ns }); await call(a, 'release');
+          const b = fresh(), c = fresh();
+          const notes = await Promise.all([call(b, 'write-shared', { namespace: ns, part: 0 }), call(c, 'write-shared', { namespace: ns, part: 1 })]);
+          if (notes.includes('unsupported')) return 'UNSUPPORTED without readwrite-unsafe handles';
+          await call(c, 'peek-shared'); await call(a, 'busy', { namespace: ns }); await call(b, 'release'); await call(c, 'release');
+          await call(fresh(), 'reopen', { namespace: ns }); return 'readwrite-unsafe handles';
+        }],
+        ['OPFS: a sync access handle held outside this package makes an open reject BUSY', async () => {
+          const ns = `${namespace}-foreign`, b = fresh(); await call(a, 'hold', { namespace: ns }); await call(a, 'release');
+          await call(b, 'foreign-hold', { namespace: ns }); await call(a, 'busy', { namespace: ns, openOnly: true }); await call(b, 'release');
+          await call(fresh(), 'reopen', { namespace: ns });
+        }],
+        ['OPFS: workers own and write different files at once', async () => {
+          const ns = `${namespace}-own-files`, b = fresh(), c = fresh();
+          await Promise.all([call(b, 'hold', { namespace: ns, file: 'one.bin' }), call(c, 'hold', { namespace: ns, file: 'two.bin' })]);
+          await call(b, 'release'); await call(c, 'release');
+        }],
         ['OPFS: terminating an owner worker releases its lock; flushed bytes persist', async () => {
           const owner = fresh(); await call(owner, 'hold', { namespace: `${namespace}-kill` }); owner.terminate();
           const reopened = await call(fresh(), 'reopen', { namespace: `${namespace}-kill`, retry: true });
@@ -90,7 +120,7 @@ async function pageSuite() {
       ];
       for (const [name, run] of scenarios) {
         try { const note = await run(); result.passed.push(typeof note === 'string' ? `${name} (${note})` : name); }
-        catch (error) { result.failed.push({ name, message: String(error?.stack ?? error) }); }
+        catch (error) { result.failed.push({ name, message: `${error?.message ?? error}\n${error?.stack ?? ""}` }); }
       }
     }
     return result;

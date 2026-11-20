@@ -4,7 +4,7 @@
 // live demo against real OPFS in Chromium, Firefox and WebKit.
 // Run after `bun run build`; writes output/site-e2e.json and screenshots to output/site/.
 import assert from 'node:assert/strict';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
@@ -321,7 +321,9 @@ describe('site in Chromium', () => {
       const explorer = page.locator('[data-explorer="home"]');
       await explorer.locator('[data-chart-id="explorer"] svg').waitFor();
       const before = await explorer.locator('[data-chart-note]').innerText();
-      assert.match(before, /0\.2\.0 reaches/);
+      // The note names the release of the newest benchmark report (site/build/data.ts picks it the same way).
+      const report = (await readdir(fileURLToPath(new URL('../../benchmarks', import.meta.url)))).filter(name => /^\d+\.\d+\.\d+-[a-z0-9]+-[a-z0-9]+\.json$/.test(name)).sort().at(-1);
+      assert.match(before, new RegExp(`${report.split('-')[0].replaceAll('.', '\\.')} reaches`));
       // Three block sizes of the current release only.
       assert.equal(await explorer.locator('tbody tr').count(), 3);
       await explorer.locator('[data-control="env"] .toggle[value="node"]').click();
@@ -329,7 +331,7 @@ describe('site in Chromium', () => {
       await explorer.locator('[data-control="metric"] .toggle[value="pipelined"]').click();
       await page.waitForFunction(old => document.querySelector('[data-explorer="home"] [data-chart-note]').textContent !== old, before);
       assert.match(await explorer.locator('[data-chart-id="explorer"]').getAttribute('aria-label'), /Node\.js/);
-      for (const id of ['options', 'overload']) {
+      for (const id of ['parallel-read', 'parallel-scan', 'options', 'overload']) {
         await page.locator(`[data-chart-id="${id}"]`).scrollIntoViewIfNeeded();
         await page.locator(`[data-chart-id="${id}"] svg`).waitFor();
       }
@@ -547,7 +549,7 @@ describe('site in Chromium', () => {
     await withContext({ viewport: { width: 1440, height: 900 } }, async context => {
       const page = await open(context, '/en/');
       // Charts mount when they come near the viewport.
-      for (const id of ['explorer', 'options', 'overload']) {
+      for (const id of ['parallel-read', 'parallel-scan', 'explorer', 'options', 'overload']) {
         await page.locator(`[data-view="home"] [data-chart-id="${id}"]`).scrollIntoViewIfNeeded();
         await page.locator(`[data-view="home"] [data-chart-id="${id}"] svg`).waitFor();
       }

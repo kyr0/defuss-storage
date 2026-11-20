@@ -14,13 +14,16 @@ import type { AdapterOptions, CancellationSignal, OpenOptions, WriteOptions } fr
 /** Default per-read allocation bound (64 MiB), so a corrupt length field fails with RangeError instead of allocating gigabytes. */
 export const DEFAULT_MAX_READ_BYTES = 64 * 1024 * 1024;
 /**
- * Admission defaults. Starting policies, not measured optima: 64 MiB lets one
- * maximal write be in flight while a handle still bounds its retained copies;
- * 1,024 operations allow deep pipelining of small reads.
+ * Admission defaults. Starting policies, not measured optima: 128 MiB of pending
+ * copies lets two maximal (64 MiB) writes be queued while a handle still bounds
+ * its retained copies; 2,048 operations allow deep pipelining of small reads.
+ * Doubled in 0.4.0 (from 64 MiB and 1,024) by maintainer decision, 2026-11-20,
+ * so that bursts reject QUEUE_FULL later; growing at a fill level instead would
+ * act as the same fixed limit, since nothing is allocated before it is used.
  */
 export const DEFAULT_MAX_WRITE_BYTES = 64 * 1024 * 1024;
-export const DEFAULT_MAX_PENDING_WRITE_BYTES = 64 * 1024 * 1024;
-export const DEFAULT_MAX_PENDING_OPERATIONS = 1024;
+export const DEFAULT_MAX_PENDING_WRITE_BYTES = 128 * 1024 * 1024;
+export const DEFAULT_MAX_PENDING_OPERATIONS = 2048;
 
 /** Resolved per-handle bounds; one immutable object per adapter, shared by its handles. */
 export interface HandleLimits {
@@ -94,19 +97,22 @@ export function validateName(name: string): void {
 /**
  * Normalizes {@link OpenOptions} to explicit values and rejects the
  * contradictory combinations `exclusive` without `create`, `readOnly` with
- * `create`, and `readOnly` with a write buffer.
+ * `create`, `readOnly` with a write buffer, and a shared writer with a write buffer.
+ * `shared` defaults to `readOnly`.
  */
 export function openOptions(options: OpenOptions): Required<OpenOptions> {
-  for (const key of ["create", "exclusive", "readOnly"] as const) {
+  for (const key of ["create", "exclusive", "readOnly", "shared"] as const) {
     if (options[key] !== undefined && typeof options[key] !== "boolean") throw new TypeError(`defuss-storage: ${key} must be boolean`);
   }
+  const readOnly = options.readOnly ?? false;
   const result = {
-    create: options.create ?? false, exclusive: options.exclusive ?? false, readOnly: options.readOnly ?? false,
-    writeBuffer: integer(options.writeBuffer ?? 0, "writeBuffer"),
+    create: options.create ?? false, exclusive: options.exclusive ?? false, readOnly,
+    shared: options.shared ?? readOnly, writeBuffer: integer(options.writeBuffer ?? 0, "writeBuffer"),
   };
   if (result.exclusive && !result.create) throw new TypeError("defuss-storage: exclusive requires create:true");
   if (result.readOnly && result.create) throw new TypeError("defuss-storage: readOnly cannot create files");
   if (result.readOnly && result.writeBuffer) throw new TypeError("defuss-storage: writeBuffer requires a writable handle");
+  if (result.shared && result.writeBuffer) throw new TypeError("defuss-storage: writeBuffer requires an owning handle");
   return result;
 }
 
