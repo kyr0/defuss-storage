@@ -53,7 +53,6 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-09T13:01:38Z s=3acf4600 FINDING site/index.html:theme-color, site/src/install.ts:copyButton, site/src/messages.ts learn=none: cosmetic; no deterministic check worth adding
 2026-11-09T18:17:00Z s=3acf4600 FINDING site/index.html:toggle data-t learn=none: visual; markup pattern documented by the fix
 2026-11-09T20:58:41Z s=3acf4600 FINDING site/e2e/site.test.mjs:597 demos in firefox learn=none: one load-related timeout; no deterministic defect to encode; .vae/MEMORY.md already says other sessions load the machine
-2026-11-10T02:04:22Z s=3acf4600 FAIL tests.e2e.1
 2026-11-10T02:36:49Z s=3acf4600 DONE fp=201e77786816 cov=99.2% paths=docs/404.html,docs/assets/backend-But3-ao0.js,docs/assets/backend-ChSdQFFH.js,docs/assets/index-B6HYNZ1Y.css(+23)
 2026-11-10T02:36:49Z s=3acf4600 FINDING site/src/styles.css:html font-size 125% learn=memory: .vae/MEMORY.md: breakpoints that must follow html font-size are container queries
 2026-11-10T02:36:49Z s=3acf4600 FINDING site/index.html:hero snippet, explorer table learn=test: the e2e axe check covers it
@@ -106,3 +105,4 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-20T04:02:05Z s=1b2c3d63 FINDING site/src/strings.ts:hero.rotate learn=test: the rotating-headings e2e test catches it
 2026-11-20T04:02:05Z s=1b2c3d63 FINDING site/index.html:#parallel learn=test: the file:// e2e test catches it
 2026-11-20T04:02:05Z s=1b2c3d63 FINDING site/src/chart-options.ts:overloadOption learn=none: visual layout; no mechanical check short of screenshot diffing
+2026-11-20T04:06:08Z s=1b2c3d63 DONE fp=4843faad12ab cov=99.1% paths=ARCH.md,CHANGELOG.md,README.md,VALIDATION.md(+62)
